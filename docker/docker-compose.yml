@@ -1,0 +1,14 @@
+services:
+  localai:
+    image: localai/localai:v2.24.1-cublas-cuda12-ffmpeg
+    container_name: localai
+    ports:
+      - "8080:8080"
+    volumes:
+      - ../models-localai:/models
+    environment:
+      - MODELS_PATH=/models
+      - DEBUG=true
+      - NVIDIA_DISABLE_REQUIRE=1
+    runtime: nvidia
+    restart: unless-stopped
