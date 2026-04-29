@@ -1,117 +1,164 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Tempest</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
+
 <body>
-  <div class="chat-app">
-    <header class="chat-header">
-      <h1>Tempest</h1>
-      <p>Asistente local conectado a tu backend</p>
+  <div class="app">
+    <aside class="sidebar">
+      <h2>Tempest</h2>
 
-<div class="smart-menu">
-  <button id="menuTrigger" class="smart-menu-trigger">modelo</button>
+      <button id="newChatBtn">+ Nuevo Chat</button>
+      <div id="chatList"></div>
 
-  <div id="smartMenuPanel" class="smart-menu-panel hidden">
-    <div id="menuViewRoot" class="menu-view">
-      <button class="menu-item" data-view="local">local</button>
-      <button class="menu-item" data-view="services">servicios</button>
+      <hr>
+
+      <button id="newProjectBtn">+ Nuevo Proyecto</button>
+      <div id="projectList"></div>
+    </aside>
+
+    <div class="chat-app">
+      <header class="chat-header">
+        <h1>Tempest</h1>
+        <p>Asistente local conectado a tu backend</p>
+
+        <div class="smart-menu">
+          <button id="menuTrigger" class="smart-menu-trigger">modelo</button>
+
+          <div id="smartMenuPanel" class="smart-menu-panel hidden">
+            <div id="menuViewRoot" class="menu-view">
+              <button class="menu-item" data-view="local">local</button>
+              <button class="menu-item" data-view="services">servicios</button>
+            </div>
+
+            <div id="menuViewLocal" class="menu-view hidden">
+              <button class="menu-back" data-back="root">← volver</button>
+              <button class="menu-item local-model" data-model="hermes-q4">Hermes Q4</button>
+              <button class="menu-item local-model" data-model="hermes-q5">Hermes Q5</button>
+              <button class="menu-item local-model" data-model="hermes-q6">Hermes Q6</button>
+              <button class="menu-item local-model" data-model="qwen_qwen3.5-0.8b">Qwen 0.8B</button>
+              <button class="menu-item local-model" data-model="mistral-7b">Mistral 7B</button>
+              <button class="menu-item local-model" data-model="auto">Automático</button>
+            </div>
+
+            <div id="menuViewServices" class="menu-view hidden">
+              <button class="menu-back" data-back="root">← volver</button>
+              <button class="menu-item service-entry" data-service="openai">OpenAI</button>
+              <button class="menu-item service-entry" data-service="google">Google</button>
+            </div>
+
+            <div id="menuViewOpenAI" class="menu-view hidden">
+              <button class="menu-back" data-back="services">← volver</button>
+              <button class="menu-item service-model" data-service="openai"
+                data-model="gpt-4o-mini">GPT-4o-mini</button>
+              <button class="menu-item service-model" data-service="openai"
+                data-model="gpt-4.1-mini">GPT-4.1-mini</button>
+            </div>
+
+            <div id="menuViewGoogle" class="menu-view hidden">
+              <button class="menu-back" data-back="services">← volver</button>
+              <button class="menu-item service-model" data-service="google" data-model="gemini-2.5-flash">Gemini 2.5
+                Flash</button>
+              <button class="menu-item service-model" data-service="google" data-model="gemini-2.5-pro">Gemini 2.5
+                Pro</button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <main id="chatBox" class="chat-box"></main>
+
+      <div id="typing" class="typing"></div>
+
+      <footer class="chat-input-area">
+        <div class="input-wrapper">
+          <div class="tool-menu">
+            <button id="toolMenuBtn" class="tool-menu-btn">+</button>
+
+            <div id="toolMenuPanel" class="tool-menu-panel hidden">
+              <button id="transcriptionBtn" class="tool-menu-item">Transcripción</button>
+              <button class="tool-menu-item" disabled>Añadir archivo</button>
+              <button class="tool-menu-item" disabled>Crear imagen</button>
+              <button class="tool-menu-item" disabled>Crear video</button>
+            </div>
+          </div>
+
+          <input id="userInput" type="text" placeholder="Escribe tu mensaje..." autocomplete="off" />
+        </div>
+
+        <button id="sendBtn">Enviar</button>
+      </footer>
     </div>
-
-    <div id="menuViewLocal" class="menu-view hidden">
-      <button class="menu-back" data-back="root">← volver</button>
-      <button class="menu-item local-model" data-model="hermes-q4">Hermes Q4</button>
-      <button class="menu-item local-model" data-model="hermes-q5">Hermes Q5</button>
-      <button class="menu-item local-model" data-model="hermes-q6">Hermes Q6</button>
-      <button class="menu-item local-model" data-model="qwen_qwen3.5-0.8b">Qwen 0.8B</button>
-      <button class="menu-item local-model" data-model="mistral-7b">Mistral 7B</button>
-      <button class="menu-item local-model" data-model="auto">Automático</button>
-    </div>
-
-    <div id="menuViewServices" class="menu-view hidden">
-      <button class="menu-back" data-back="root">← volver</button>
-      <button class="menu-item service-entry" data-service="openai">OpenAI</button>
-      <button class="menu-item service-entry" data-service="google">Google</button>
-    </div>
-
-    <div id="menuViewOpenAI" class="menu-view hidden">
-      <button class="menu-back" data-back="services">← volver</button>
-      <button class="menu-item service-model" data-service="openai" data-model="gpt-4o-mini">GPT-4o-mini</button>
-      <button class="menu-item service-model" data-service="openai" data-model="gpt-4.1-mini">GPT-4.1-mini</button>
-      <button class="menu-item service-model" data-service="openai" data-model="auto">Automático</button>
-    </div>
-
-    <div id="menuViewGoogle" class="menu-view hidden">
-      <button class="menu-back" data-back="services">← volver</button>
-      <button class="menu-item service-model" data-service="google" data-model="gemini-2.5-flash">Gemini 2.5 Flash</button>
-      <button class="menu-item service-model" data-service="google" data-model="gemini-2.5-pro">Gemini 2.5 Pro</button>
-      <button class="menu-item service-model" data-service="google" data-model="auto">Automático</button>
-    </div>
-
-  </div>
-</div>
-    </header>
-
-    <main id="chatBox" class="chat-box"></main>
-
-    <div id="typing" class="typing"></div>
-
-<footer class="chat-input-area">
-  <div class="input-wrapper">
-    <div class="tool-menu">
-      <button id="toolMenuBtn" class="tool-menu-btn">+</button>
-
-      <div id="toolMenuPanel" class="tool-menu-panel hidden">
-        <button id="transcriptionBtn" class="tool-menu-item">Transcripción</button>
-        <button class="tool-menu-item" disabled>Añadir archivo</button>
-        <button class="tool-menu-item" disabled>Crear imagen</button>
-        <button class="tool-menu-item" disabled>Crear video</button>
-      </div>
-    </div>
-
-    <input
-      type="text"
-      id="userInput"
-      placeholder="Escribe tu mensaje..."
-      autocomplete="off"
-    />
-  </div>
-
-  <button id="sendBtn">Enviar</button>
-</footer>
-
   </div>
 
   <div id="transcriptionModal" class="modal-overlay hidden">
+    <div class="modal-box">
+      <h2>Transcripción</h2>
+
+      <label>Audio</label>
+      <input type="file" id="transcriptionAudioInput" accept="audio/*" />
+
+      <label>Tipo de texto</label>
+      <select id="transcriptionMode">
+        <option value="plain">Texto corrido</option>
+        <option value="timestamps">Con divisiones de tiempo</option>
+      </select>
+
+      <label>Formato</label>
+      <select id="transcriptionFormat">
+        <option value="txt">TXT</option>
+        <option value="pdf">PDF</option>
+        <option value="docx">Word DOCX</option>
+      </select>
+
+      <div class="modal-actions">
+        <button id="cancelTranscriptionBtn">Cancelar</button>
+        <button id="processTranscriptionBtn">Crear archivo</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="deleteConfirmModal" class="modal-overlay hidden">
+    <div class="modal-box">
+      <h2>Confirmar eliminación</h2>
+      <p id="deleteConfirmText"></p>
+
+      <div class="modal-actions">
+        <button id="cancelDeleteBtn">Cancelar</button>
+        <button id="confirmDeleteBtn">Eliminar</button>
+      </div>
+    </div>
+  </div>
+<div id="deleteConfirmModal" class="modal-overlay hidden">
   <div class="modal-box">
-    <h2>Transcripción</h2>
-
-    <label>Audio</label>
-    <input type="file" id="transcriptionAudioInput" accept="audio/*" />
-
-    <label>Tipo de texto</label>
-    <select id="transcriptionMode">
-      <option value="plain">Texto corrido</option>
-      <option value="timestamps">Con divisiones de tiempo</option>
-    </select>
-
-    <label>Formato</label>
-    <select id="transcriptionFormat">
-      <option value="txt">TXT</option>
-      <option value="pdf">PDF</option>
-      <option value="docx">Word DOCX</option>
-    </select>
+    <h2>Confirmar eliminación</h2>
+    <p id="deleteConfirmText"></p>
 
     <div class="modal-actions">
-      <button id="cancelTranscriptionBtn">Cancelar</button>
-      <button id="processTranscriptionBtn">Crear archivo</button>
+      <button id="cancelDeleteBtn">Cancelar</button>
+      <button id="confirmDeleteBtn">Eliminar</button>
     </div>
   </div>
 </div>
+  <div id="newProjectModal" class="modal-overlay hidden">
+  <div class="modal-box">
+    <h2>Nuevo proyecto</h2>
 
+    <label>Nombre del proyecto</label>
+    <input id="newProjectNameInput" type="text" placeholder="Ejemplo: IA local, Trabajo, Backend..." />
+
+    <div class="modal-actions">
+      <button id="cancelNewProjectBtn">Cancelar</button>
+      <button id="confirmNewProjectBtn">Crear</button>
+    </div>
+  </div>
+</div>
   <script type="module" src="app.js"></script>
 </body>
+
 </html>

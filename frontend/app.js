@@ -1,4 +1,19 @@
-import { sendChatMessage, transcribeAudio } from './api.js';
+import {
+  sendChatMessage,
+  transcribeAudio,
+  getChatHistory,
+  listChats,
+  createChat,
+  listProjects,
+  createProject,
+  deleteChat,
+  deleteProject,
+  renameChat,
+  renameProject,
+  generateTitle
+} from './api.js';
+
+import { setActiveChat, getChatState } from './chatState.js';
 import { addMessage } from './ui.js';
 
 const chatBox = document.getElementById('chatBox');
@@ -18,8 +33,23 @@ const menuViewGoogle = document.getElementById('menuViewGoogle');
 const toolMenuBtn = document.getElementById('toolMenuBtn');
 const toolMenuPanel = document.getElementById('toolMenuPanel');
 
+const deleteConfirmModal = document.getElementById('deleteConfirmModal');
+const deleteConfirmText = document.getElementById('deleteConfirmText');
+const cancelDeleteBtn = document.getElementById('cancelDeleteBtn');
+const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
+const newProjectModal = document.getElementById('newProjectModal');
+const newProjectNameInput = document.getElementById('newProjectNameInput');
+const cancelNewProjectBtn = document.getElementById('cancelNewProjectBtn');
+const confirmNewProjectBtn = document.getElementById('confirmNewProjectBtn');
+
+
+let pendingDelete = null;
+
 
 let primaryModel = 'hermes-q4';
+const collapsedProjects = new Set();
+let sidebarInitialized = false;
+let pendingAutoRename = null;
 
 const assistantsState = {
   openai: {
@@ -200,41 +230,24 @@ function getAssistants() {
   ];
 }
 
-async function sendMessage() {
-  const message = userInput.value.trim();
-  if (!message) return;
-
-  const config = {
-    primaryModel,
-    assistants: getAssistants()
-  };
-
-  addMessage(chatBox, 'Tú', message);
-  userInput.value = '';
-  typing.textContent = 'Tempest está pensando...';
-  sendBtn.disabled = true;
-  userInput.disabled = true;
-
+async function loadChatHistory() {
   try {
-    const data = await sendChatMessage(message, config);
+    const data = await getChatHistory();
 
-    if (data.ok) {
-      addMessage(chatBox, 'Tempest', data.reply);
-    } else {
-      addMessage(chatBox, 'Tempest', 'Ocurrió un error: ' + (data.error || 'Desconocido'));
+    if (!data.ok || !Array.isArray(data.history)) {
+      return;
     }
+
+    chatBox.innerHTML = '';
+
+    data.history.forEach(msg => {
+      const sender = msg.role === 'user' ? 'Tú' : 'Tempest';
+      addMessage(chatBox, sender, msg.content);
+    });
   } catch (error) {
-    addMessage(chatBox, 'Tempest', 'No pude conectar con el backend.');
-    console.error(error);
-  } finally {
-    typing.textContent = '';
-    sendBtn.disabled = false;
-    userInput.disabled = false;
-    userInput.focus();
+    console.error('No se pudo cargar el historial:', error);
   }
 }
-
-sendBtn.addEventListener('click', sendMessage);
 
 toolMenuBtn.addEventListener('click', () => {
   toolMenuPanel.classList.toggle('hidden');
@@ -258,6 +271,7 @@ processTranscriptionBtn.addEventListener('click', async () => {
   }
 
   transcriptionModal.classList.add('hidden');
+  await ensureGeneralChatExists();
 
   typing.textContent = 'Transcribiendo audio...';
   sendBtn.disabled = true;
@@ -317,8 +331,450 @@ showMenuView('root');
 refreshLocalActiveState();
 refreshServiceActiveState();
 
-addMessage(
-  chatBox,
-  'Tempest',
-  'Hola, soy Tempest, una inteligencia artificial local de asistencia en español. ¿En qué puedo ayudarte hoy?'
-);
+renderWelcomeScreen();
+
+function renderWelcomeScreen() {
+  chatBox.innerHTML = `
+    <div class="welcome-screen">
+      <h2>¿En qué puedo ayudarte?</h2>
+      <p>Escribe un mensaje o usa una herramienta para iniciar un nuevo chat.</p>
+    </div>
+  `;
+}
+
+async function ensureGeneralChatExists() {
+  const state = getChatState();
+
+  if (state.chatId && state.mode !== 'landing') {
+    return;
+  }
+
+  const id = 'chat-' + Date.now();
+
+  const targetProjectId = state.projectId || 'general';
+  await createChat(id, targetProjectId);
+
+  setActiveChat({
+    projectId: targetProjectId,
+    chatId: id,
+    mode: targetProjectId === 'general' ? 'chat' : 'project'
+  });
+
+  pendingAutoRename = {
+    type: 'chat',
+    projectId: targetProjectId,
+    chatId: id
+  };
+
+  await loadSidebar();
+  chatBox.innerHTML = '';
+}
+
+async function sendMessage() {
+  const message = userInput.value.trim();
+  if (!message) return;
+
+  await ensureGeneralChatExists();
+
+  const config = {
+    primaryModel,
+    assistants: getAssistants()
+  };
+
+  addMessage(chatBox, 'Tú', message);
+  userInput.value = '';
+  typing.textContent = 'Tempest está pensando...';
+  sendBtn.disabled = true;
+  userInput.disabled = true;
+
+  try {
+    const data = await sendChatMessage(message, config);
+
+    if (data.ok) {
+      addMessage(chatBox, 'Tempest', data.reply);
+
+      if (pendingAutoRename) {
+        const renameTarget = { ...pendingAutoRename };
+        const titleData = await generateTitle(message, renameTarget.type);
+
+        if (titleData.ok && titleData.title) {
+          await renameChat(
+            renameTarget.chatId,
+            titleData.title,
+            renameTarget.projectId
+          );
+
+          setActiveChat({
+            projectId: renameTarget.projectId,
+            chatId: titleData.title,
+            mode: renameTarget.projectId === 'general' ? 'chat' : 'project'
+          });
+
+          pendingAutoRename = null;
+          await loadSidebar();
+        }
+      }
+    } else {
+      addMessage(
+        chatBox,
+        'Tempest',
+        'Ocurrió un error: ' + (data.error || 'Desconocido')
+      );
+    }
+  } catch (error) {
+    addMessage(chatBox, 'Tempest', 'No pude conectar con el backend.');
+    console.error(error);
+  } finally {
+    typing.textContent = '';
+    sendBtn.disabled = false;
+    userInput.disabled = false;
+    userInput.focus();
+  }
+}
+
+sendBtn.addEventListener('click', sendMessage);
+
+function createActionsMenu({ type, id, projectId }) {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'sidebar-item';
+
+  const label = document.createElement('span');
+  label.textContent = id;
+  label.className = 'sidebar-item-label';
+
+  const dots = document.createElement('button');
+  dots.textContent = '⋯';
+  dots.className = 'sidebar-dots';
+
+  const menu = document.createElement('div');
+  menu.className = 'sidebar-context-menu hidden';
+
+  const renameBtn = document.createElement('button');
+  renameBtn.textContent = 'Renombrar';
+
+  const deleteBtn = document.createElement('button');
+  deleteBtn.textContent = 'Eliminar';
+
+  renameBtn.onclick = async (event) => {
+    event.stopPropagation();
+
+    const newName = prompt('Nuevo nombre:', id);
+    if (!newName || newName === id) return;
+
+    if (type === 'chat') {
+      await renameChat(id, newName, projectId);
+    }
+
+    if (type === 'project') {
+      await renameProject(id, newName);
+    }
+
+    await loadSidebar();
+  };
+
+  deleteBtn.onclick = async (event) => {
+    event.stopPropagation();
+
+    pendingDelete = { type, id, projectId };
+
+    deleteConfirmText.textContent =
+      `¿Estás seguro de que deseas eliminar "${id}"?`;
+
+    deleteConfirmModal.classList.remove('hidden');
+  };
+
+  dots.onclick = (event) => {
+    event.stopPropagation();
+
+    document
+      .querySelectorAll('.sidebar-context-menu')
+      .forEach(item => item.classList.add('hidden'));
+
+    menu.classList.toggle('hidden');
+  };
+
+  menu.appendChild(renameBtn);
+  menu.appendChild(deleteBtn);
+
+  wrapper.appendChild(label);
+  wrapper.appendChild(dots);
+  wrapper.appendChild(menu);
+
+  return wrapper;
+}
+
+cancelDeleteBtn.onclick = () => {
+  pendingDelete = null;
+  deleteConfirmModal.classList.add('hidden');
+};
+
+confirmDeleteBtn.onclick = async () => {
+  if (!pendingDelete) return;
+
+  const { type, id, projectId } = pendingDelete;
+
+  if (type === 'chat') {
+    await deleteChat(id, projectId);
+  }
+
+  if (type === 'project') {
+    await deleteProject(id);
+  }
+
+  pendingDelete = null;
+  deleteConfirmModal.classList.add('hidden');
+
+  renderWelcomeScreen();
+  await loadSidebar();
+};
+
+async function loadChats(projectId = 'general') {
+  try {
+    const res = await listChats(projectId);
+    const container = document.getElementById('chatList');
+
+    container.innerHTML = '';
+
+    if (!res.ok || !Array.isArray(res.chats)) {
+      container.textContent = 'No se pudieron cargar los chats';
+      return;
+    }
+
+    res.chats
+      .filter(chatId => chatId !== 'default')
+      .forEach(chatId => {
+        const item = document.createElement('div');
+        const state = getChatState();
+
+        item.className =
+          state.projectId === projectId && state.chatId === chatId
+            ? 'sidebar-link active-chat'
+            : 'sidebar-link';
+
+        const itemContent = createActionsMenu({
+          type: 'chat',
+          id: chatId,
+          projectId
+        });
+
+        item.appendChild(itemContent);
+        item.onclick = () => {
+          setActiveChat({
+            projectId,
+            chatId,
+            mode: 'project'
+          });
+
+          loadChatHistory();
+          loadSidebar();
+        };
+
+        container.appendChild(item);
+      });
+
+  } catch (error) {
+    console.error('Error cargando chats:', error);
+  }
+}
+
+async function loadProjects() {
+  const res = await listProjects();
+  const container = document.getElementById('projectList');
+
+  container.innerHTML = '';
+
+  if (!res.ok || !Array.isArray(res.projects)) {
+    container.textContent = 'No se pudieron cargar los proyectos';
+    return;
+  }
+
+  const visibleProjects = res.projects.filter(projectId => projectId !== 'general');
+
+  if (!sidebarInitialized) {
+    visibleProjects.forEach(projectId => collapsedProjects.add(projectId));
+    sidebarInitialized = true;
+  }
+
+  for (const projectId of visibleProjects) {
+    const projectBlock = document.createElement('div');
+    projectBlock.className = 'project-block';
+
+    const projectTitle = document.createElement('div');
+    projectTitle.className = 'project-title';
+    const state = getChatState();
+    const isCollapsed = collapsedProjects.has(projectId);
+    const isActiveProject = state.projectId === projectId;
+
+    projectTitle.className =
+      isCollapsed && isActiveProject
+        ? 'project-title active-chat'
+        : 'project-title';
+
+    projectTitle.textContent = `${isCollapsed ? '▸' : '▾'} `;
+
+    const projectActions = createActionsMenu({
+      type: 'project',
+      id: projectId,
+      projectId
+    });
+
+    projectTitle.appendChild(projectActions);
+
+    const projectChats = document.createElement('div');
+    projectChats.className = 'project-chats';
+
+    projectTitle.onclick = async () => {
+      if (collapsedProjects.has(projectId)) {
+        collapsedProjects.delete(projectId);
+      } else {
+        collapsedProjects.add(projectId);
+      }
+
+      setActiveChat({
+        projectId,
+        chatId: 'default',
+        mode: 'project'
+      });
+
+      await loadSidebar();
+      loadChatHistory();
+    };
+
+    projectBlock.appendChild(projectTitle);
+    projectBlock.appendChild(projectChats);
+    container.appendChild(projectBlock);
+
+    if (!collapsedProjects.has(projectId)) {
+      await loadProjectChats(projectId, projectChats);
+    }
+  }
+}
+
+document.getElementById('newChatBtn').onclick = async () => {
+  setActiveChat({
+    projectId: 'general',
+    chatId: null,
+    mode: 'landing'
+  });
+
+  pendingAutoRename = null;
+
+  renderWelcomeScreen();
+  await loadSidebar();
+  userInput.focus();
+};
+
+document.getElementById('newProjectBtn').onclick = () => {
+  newProjectNameInput.value = '';
+  newProjectModal.classList.remove('hidden');
+  newProjectNameInput.focus();
+};
+
+cancelNewProjectBtn.onclick = () => {
+  newProjectModal.classList.add('hidden');
+};
+
+confirmNewProjectBtn.onclick = async () => {
+  const projectName = newProjectNameInput.value.trim();
+
+  if (!projectName) {
+    alert('Escribe un nombre para el proyecto');
+    return;
+  }
+
+  await createProject(projectName);
+
+  setActiveChat({
+    projectId: projectName,
+    chatId: null,
+    mode: 'landing'
+  });
+
+  pendingAutoRename = null;
+
+  newProjectModal.classList.add('hidden');
+  renderWelcomeScreen();
+  await loadSidebar();
+  userInput.focus();
+};
+
+async function loadSidebar() {
+  await loadChats();
+  await loadProjects();
+}
+
+loadSidebar();
+
+async function loadProjectChats(projectId, container) {
+  const res = await listChats(projectId);
+
+  container.innerHTML = '';
+
+  const newChatItem = document.createElement('div');
+  newChatItem.className = 'sidebar-link project-chat-link new-project-chat';
+  newChatItem.textContent = '+ Nuevo chat';
+
+  newChatItem.onclick = async () => {
+    const id = 'chat-' + Date.now();
+
+    await createChat(id, projectId);
+
+    setActiveChat({
+      projectId,
+      chatId: id,
+      mode: 'project'
+    });
+
+    pendingAutoRename = {
+      type: 'chat',
+      projectId,
+      chatId: id
+    };
+
+    chatBox.innerHTML = '';
+    renderWelcomeScreen();
+
+    await loadSidebar();
+    userInput.focus();
+  };
+
+  container.appendChild(newChatItem);
+
+  if (!res.ok || !Array.isArray(res.chats)) {
+    return;
+  }
+
+  res.chats
+    .filter(chatId => chatId !== 'default')
+    .forEach(chatId => {
+      const chatItem = document.createElement('div');
+      const state = getChatState();
+
+      chatItem.className =
+        state.projectId === projectId && state.chatId === chatId
+          ? 'sidebar-link project-chat-link active-chat'
+          : 'sidebar-link project-chat-link';
+
+      const itemContent = createActionsMenu({
+        type: 'chat',
+        id: chatId,
+        projectId
+      });
+
+      chatItem.appendChild(itemContent);
+
+
+      chatItem.onclick = () => {
+        setActiveChat({
+          projectId,
+          chatId,
+          mode: 'project'
+        });
+
+        loadChatHistory();
+        loadSidebar();
+      };
+
+      container.appendChild(chatItem);
+    });
+}

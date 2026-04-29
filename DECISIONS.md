@@ -1,27 +1,28 @@
 # Decisiones de Diseño - Tempest
 
-Este documento describe las decisiones técnicas clave tomadas durante el desarrollo del sistema.
+Este documento registra las decisiones técnicas principales tomadas durante el desarrollo.
 
 ---
 
-## 🧠 Uso de LocalAI en lugar de APIs externas
+## 🧠 Uso de LocalAI como motor principal
 
 ### Decisión
 
-Utilizar LocalAI como motor principal de inferencia.
+Usar LocalAI como motor principal de inferencia.
 
 ### Razón
 
 - independencia de servicios externos
-- control total del entorno
-- sin costos por uso
-- privacidad de datos
+- privacidad
+- ejecución local
+- sin costo por token
+- control sobre modelos GGUF
 
 ### Impacto
 
-- mayor control
-- menor dependencia
-- limitación en capacidad comparado con modelos comerciales
+- más control
+- mayor complejidad técnica
+- menor potencia que modelos comerciales grandes
 
 ---
 
@@ -33,15 +34,16 @@ Construir el backend con Node.js y Express.
 
 ### Razón
 
-- simplicidad
-- rapidez de desarrollo
-- buena integración con frontend JS
-- fácil modularización
+- simple de depurar
+- alineado con JavaScript del frontend
+- buena base para APIs REST
+- modularización clara
 
 ### Impacto
 
-- estructura clara y extensible
-- aprendizaje alineado a desarrollo backend moderno
+- desarrollo rápido
+- fácil expansión
+- buen proyecto de portafolio backend
 
 ---
 
@@ -55,101 +57,175 @@ Separar el backend en:
 - controllers
 - services
 - utils
+- config
 
 ### Razón
 
-- mejorar mantenibilidad
-- reducir acoplamiento
-- facilitar crecimiento
+- mejorar orden
+- evitar archivos gigantes
+- facilitar mantenimiento
 
 ### Impacto
 
-- código más limpio
-- fácil de escalar
+- código más profesional
+- cambios localizados
+- base preparada para crecer
 
 ---
 
-## 🧠 Memoria basada en JSON
+## 🧠 Memoria jerárquica
 
 ### Decisión
 
-Usar archivos JSON para persistencia inicial.
+Separar memoria en tres niveles:
+
+```text
+Usuario → Proyecto → Chat
+```
 
 ### Razón
 
-- implementación rápida
-- fácil depuración
-- suficiente para MVP
+- evitar mezclar conversaciones
+- permitir proyectos con múltiples chats
+- mantener contexto global del usuario
+- aislar historiales individuales
 
 ### Impacto
 
-- simplicidad inicial
-- limitación para múltiples usuarios
+- mejor organización
+- experiencia parecida a ChatGPT
+- base para multiusuario real
 
 ---
 
-## 🧾 Limpieza de respuestas del modelo
+## 📁 Uso de JSON para persistencia inicial
 
 ### Decisión
 
-Procesar la salida del modelo antes de enviarla al frontend.
+Guardar memoria, proyectos y chats en archivos JSON.
 
 ### Razón
 
-- evitar respuestas vacías o mal formateadas
-- mejorar consistencia
+- fácil de inspeccionar
+- rápido de implementar
+- ideal para MVP local
+- no requiere base de datos todavía
 
 ### Impacto
 
-- mejor experiencia de usuario
-- control sobre la salida
+- depuración sencilla
+- estructura visible
+- futura migración necesaria a DB si crece
 
 ---
 
-## ⚙️ Uso de prompt dinámico
+## 💬 Chats independientes y chats por proyecto
 
 ### Decisión
 
-Construir el prompt del sistema dinámicamente con memoria.
+Permitir dos tipos de conversación:
+
+- chats sin proyecto en `general`
+- chats ligados a proyectos
 
 ### Razón
 
-- personalización
-- mayor coherencia en respuestas
-- integración de contexto
+- separar trabajo rápido de trabajo organizado
+- replicar flujo moderno tipo workspace
+- facilitar contexto por proyecto
 
 ### Impacto
 
-- respuestas más naturales
-- mejor continuidad conversacional
+- mejor UX
+- mejor organización
+- más lógica en frontend y memoria
 
 ---
 
-## 📌 Estado actual
-
-El sistema está diseñado como una base modular que permite evolución futura hacia:
-
-- selección dinámica de modelos
-- integración con servicios externos
-- sistema híbrido de inferencia
-- memoria avanzada
-
----
-
-## 🎙️ Sistema de transcripción local
+## 🏷️ Renombrado automático con IA
 
 ### Decisión
 
-Implementar transcripción de audio utilizando ffmpeg + LocalAI (Whisper).
+Usar la primera consulta para generar título automático del chat.
 
 ### Razón
 
-- evitar costos de APIs externas
-- mantener procesamiento completamente local
-- integración directa con el sistema existente
+- evitar nombres genéricos tipo `chat-123`
+- mejorar navegación
+- experiencia más natural
 
 ### Impacto
 
-- mayor control del flujo
-- mayor complejidad técnica
-- necesidad de manejo de errores en fragmentos de audio
+- sidebar más útil
+- requiere endpoint `/title/generate`
+- depende de LocalAI
+
+---
+
+## ✏️ Renombrar y eliminar desde sidebar
+
+### Decisión
+
+Añadir menú de tres puntos en chats y proyectos.
+
+### Razón
+
+- dar control al usuario
+- evitar borrar manualmente archivos
+- acercar la UI a herramientas modernas
+
+### Impacto
+
+- UX más completa
+- requiere endpoints de rename/delete
+- necesita validación de nombres
+
+---
+
+## 🧾 Modal propio para confirmación
+
+### Decisión
+
+Usar un modal interno en lugar de `confirm()` del navegador.
+
+### Razón
+
+- mejor estética
+- coherencia visual
+- más control de UI
+
+### Impacto
+
+- interfaz más profesional
+- más código frontend
+
+---
+
+## 🎙️ Transcripción local
+
+### Decisión
+
+Implementar transcripción con ffmpeg + LocalAI Whisper.
+
+### Razón
+
+- evitar APIs externas
+- mantener procesamiento local
+- reutilizar LocalAI
+
+### Impacto
+
+- mayor privacidad
+- mayor carga técnica
+- requiere limpieza de temporales
+
+---
+
+## 🔮 Decisiones futuras
+
+- Migrar memoria JSON a base de datos.
+- Añadir login real.
+- Añadir resumen automático por chat/proyecto.
+- Añadir embeddings para búsqueda semántica.
+- Añadir renombrado automático de proyectos opcional.
+

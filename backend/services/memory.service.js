@@ -1,83 +1,234 @@
 const fs = require('fs');
 const path = require('path');
 
-const memoryFilePath = path.join(__dirname, '../data/memory.json');
-const MAX_WORKING_MEMORY = 5;
+const DEFAULT_USER_ID = 'local-user';
+const DEFAULT_PROJECT_ID = 'tempest';
+const DEFAULT_CHAT_ID = 'default';
 
-function getInitialMemory() {
+const MAX_WORKING_MEMORY = 12;
+
+const dataPath = path.join(__dirname, '../data');
+const usersPath = path.join(dataPath, 'users');
+
+function ensureDir(dirPath) {
+  if (!fs.existsSync(dirPath)) {
+    fs.mkdirSync(dirPath, { recursive: true });
+  }
+}
+
+function readJson(filePath, fallback) {
+  try {
+    if (!fs.existsSync(filePath)) {
+      writeJson(filePath, fallback);
+      return fallback;
+    }
+
+    const rawData = fs.readFileSync(filePath, 'utf-8');
+    return JSON.parse(rawData);
+  } catch (error) {
+    console.error(`Error al leer JSON: ${filePath}`, error);
+    return fallback;
+  }
+}
+
+function writeJson(filePath, data) {
+  try {
+    ensureDir(path.dirname(filePath));
+    fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
+  } catch (error) {
+    console.error(`Error al guardar JSON: ${filePath}`, error);
+  }
+}
+
+function getPaths(options = {}) {
+  const userId = options.userId || DEFAULT_USER_ID;
+  const projectId = options.projectId || DEFAULT_PROJECT_ID;
+  const chatId = options.chatId || DEFAULT_CHAT_ID;
+
+  const userPath = path.join(usersPath, userId);
+  const projectPath = path.join(userPath, 'projects', projectId);
+  const chatsPath = path.join(projectPath, 'chats');
+
   return {
-    profile: {},
-    workingMemory: [],
+    userId,
+    projectId,
+    chatId,
+    userPath,
+    projectPath,
+    projectDir: projectPath,
+    projectsDir: path.join(userPath, 'projects'),
+    chatsPath,
+    chatsDir: chatsPath,
+    profileFile: path.join(userPath, 'profile.json'),
+    projectMemoryFile: path.join(projectPath, 'projectMemory.json'),
+    chatFile: path.join(chatsPath, `${chatId}.json`)
+  };
+}
+
+function getInitialProfile() {
+  return {
+    name: '',
+    previousNames: [],
+    birthPlace: '',
+    nationality: '',
+    likes: [],
+    goals: [],
+    preferences: [],
+    currentProject: ''
+  };
+}
+
+function getInitialProjectMemory() {
+  return {
+    projectId: DEFAULT_PROJECT_ID,
+    name: 'Tempest',
+    facts: [],
+    goals: [],
+    currentTasks: [],
+    decisions: [],
     summary: ''
   };
 }
 
-function ensureMemoryFile() {
-  if (!fs.existsSync(memoryFilePath)) {
-    fs.writeFileSync(
-      memoryFilePath,
-      JSON.stringify(getInitialMemory(), null, 2),
-      'utf-8'
-    );
-  }
+function getInitialChatMemory() {
+  return {
+    chatId: DEFAULT_CHAT_ID,
+    title: 'Nuevo chat',
+    chatHistory: [],
+    workingMemory: []
+  };
 }
 
-function loadMemory() {
-  try {
-    ensureMemoryFile();
-
-    const rawData = fs.readFileSync(memoryFilePath, 'utf-8');
-    const parsed = JSON.parse(rawData);
-
-    return {
-      profile: parsed.profile || {},
-      workingMemory: Array.isArray(parsed.workingMemory)
-        ? parsed.workingMemory
-        : [],
-      summary: parsed.summary || ''
-    };
-  } catch (error) {
-    console.error('Error al cargar memory.json:', error);
-    return getInitialMemory();
-  }
+function normalizeText(value) {
+  return String(value || '').trim().replace(/\s+/g, ' ');
 }
 
-function saveMemory(memory) {
-  try {
-    fs.writeFileSync(memoryFilePath, JSON.stringify(memory, null, 2), 'utf-8');
-  } catch (error) {
-    console.error('Error al guardar memory.json:', error);
-  }
+function capitalizeText(value) {
+  const clean = normalizeText(value).toLowerCase();
+
+  return clean.replace(/\b[a-záéíóúñ]/gi, char => char.toUpperCase());
 }
 
+function addUnique(array, value) {
+  const cleanValue = normalizeText(value);
 
+  if (!cleanValue) return array;
+
+  const exists = array.some(
+    item => item.toLowerCase() === cleanValue.toLowerCase()
+  );
+
+  if (!exists) {
+    array.push(cleanValue);
+  }
+
+  return array;
+}
+
+function loadProfile(options = {}) {
+  const paths = getPaths(options);
+  return readJson(paths.profileFile, getInitialProfile());
+}
+
+function saveProfile(profile, options = {}) {
+  const paths = getPaths(options);
+  writeJson(paths.profileFile, profile);
+  return profile;
+}
+
+function loadProjectMemory(options = {}) {
+  const paths = getPaths(options);
+  return readJson(paths.projectMemoryFile, getInitialProjectMemory());
+}
+
+function saveProjectMemory(projectMemory, options = {}) {
+  const paths = getPaths(options);
+  writeJson(paths.projectMemoryFile, projectMemory);
+  return projectMemory;
+}
+
+function loadChatMemory(options = {}) {
+  const paths = getPaths(options);
+  return readJson(paths.chatFile, {
+    ...getInitialChatMemory(),
+    chatId: paths.chatId
+  });
+}
+
+function saveChatMemory(chatMemory, options = {}) {
+  const paths = getPaths(options);
+  writeJson(paths.chatFile, chatMemory);
+  return chatMemory;
+}
+
+function addChatHistoryMessage(role, content, options = {}) {
+  const chatMemory = loadChatMemory(options);
+
+  chatMemory.chatHistory = Array.isArray(chatMemory.chatHistory)
+    ? chatMemory.chatHistory
+    : [];
+
+  chatMemory.chatHistory.push({
+    role,
+    content,
+    timestamp: new Date().toISOString()
+  });
+
+  saveChatMemory(chatMemory, options);
+}
+
+function getChatHistory(options = {}) {
+  const chatMemory = loadChatMemory(options);
+
+  return Array.isArray(chatMemory.chatHistory)
+    ? chatMemory.chatHistory
+    : [];
+}
+
+function clearChatHistory(options = {}) {
+  const chatMemory = loadChatMemory(options);
+
+  chatMemory.chatHistory = [];
+  saveChatMemory(chatMemory, options);
+}
+
+function loadMemory(options = {}) {
+  return {
+    profile: loadProfile(options),
+    projectMemory: loadProjectMemory(options),
+    chatMemory: loadChatMemory(options)
+  };
+}
+
+function saveMemory(memory, options = {}) {
+  if (memory.profile) saveProfile(memory.profile, options);
+  if (memory.projectMemory) saveProjectMemory(memory.projectMemory, options);
+  if (memory.chatMemory) saveChatMemory(memory.chatMemory, options);
+
+  return loadMemory(options);
+}
 
 function isImportantMessage(content) {
   const text = content.toLowerCase();
 
-return (
-  text.includes('me llamo') ||
-  text.includes('mi nombre') ||
-  text.includes('soy de') ||
-  text.includes('nací en') ||
-  text.includes('naci en') ||
-  text.includes('mi nacionalidad es') ||
+  // No guardar preguntas como memoria
+  if (text.includes('?') || text.includes('¿')) return false;
 
-  // edad (más preciso)
-  (text.includes('tengo') && text.includes('años')) ||
-
-  // intereses
-  text.includes('me gusta') ||
-
-  // objetivos
-  text.includes('quiero aprender') ||
-
-  // contexto actual
-  text.includes('estoy trabajando en') ||
-
-  // preferencias
-  text.includes('prefiero')
-);
+  return (
+    text.includes('me llamo') ||
+    text.includes('mi nombre') ||
+    text.includes('soy de') ||
+    text.includes('nací en') ||
+    text.includes('naci en') ||
+    text.includes('mi nacionalidad es') ||
+    (text.includes('tengo') && text.includes('años')) ||
+    text.includes('me gusta') ||
+    text.includes('quiero aprender') ||
+    text.includes('quiero') ||
+    text.includes('estoy trabajando en') ||
+    text.includes('trabajo en') ||
+    text.includes('prefiero')
+  );
 }
 
 function isGarbage(text) {
@@ -85,116 +236,107 @@ function isGarbage(text) {
 
   return (
     cleanText.includes('://') ||
-    cleanText.length < 5
+    cleanText.length < 5 ||
+    cleanText.trim() === '//' ||
+    cleanText.includes('<|')
   );
 }
 
-function buildSummary(memory) {
-  const messages = memory.workingMemory;
+function addMessage(role, content, options = {}) {
+  const chatMemory = loadChatMemory(options);
 
-  if (!messages.length) return memory.summary || '';
+  // 🧠 SOLO guardar mensajes importantes del usuario
+  if (role === 'user') {
+    if (!isImportantMessage(content)) return;
 
-  const userMessages = messages
-    .filter(msg => msg.role === 'user')
-    .map(msg => msg.content);
-
-  const lastMessages = userMessages.slice(-5).join('. ');
-
-  // NO encadenar infinitamente
-  return `Datos del usuario: ${lastMessages}`;
-}
-
-function addMessage(role, content) {
-  const memory = loadMemory();
-  const text = content.toLowerCase();
-
-  // guardar solo mensajes importantes del usuario
-  if (role === 'user' && isImportantMessage(content)) {
-    memory.workingMemory.push({
+    chatMemory.workingMemory.push({
       role,
       content,
       timestamp: new Date().toISOString()
     });
   }
 
-  // guardar solo respuestas útiles del assistant
-  if (role === 'assistant') {
-    if (text.length < 10) return;
-    if (isGarbage(content)) return;
-    if (text.includes('es un placer conocerte')) return;
-    if (text.includes('como ia')) return;
-    if (text.includes('puedo ayudarte')) return;
-    if (text.includes('estoy aquí para ayudarte')) return;
-    if (content.length > 150) return;
+  // ❌ NO guardar respuestas del assistant
+  // Evita que el modelo contamine la memoria con cosas inventadas.
 
-    memory.workingMemory.push({
-      role,
-      content,
-      timestamp: new Date().toISOString()
-    });
+  if (chatMemory.workingMemory.length > MAX_WORKING_MEMORY) {
+    chatMemory.workingMemory =
+      chatMemory.workingMemory.slice(-MAX_WORKING_MEMORY);
   }
 
-  if (memory.workingMemory.length >= MAX_WORKING_MEMORY) {
-  memory.summary = buildSummary(memory);
-  memory.workingMemory = [];
-  }
-
-  saveMemory(memory);
+  saveChatMemory(chatMemory, options);
 }
 
-function getWorkingMemory() {
-  const memory = loadMemory();
-  return memory.workingMemory;
+function getWorkingMemory(options = {}) {
+  return loadChatMemory(options).workingMemory;
 }
 
-function clearWorkingMemory() {
-  const memory = loadMemory();
-  memory.workingMemory = [];
-  saveMemory(memory);
+function clearWorkingMemory(options = {}) {
+  const chatMemory = loadChatMemory(options);
+  chatMemory.workingMemory = [];
+  saveChatMemory(chatMemory, options);
 }
 
-function updateProfile(newData) {
-  const memory = loadMemory();
+function updateProfile(newData, options = {}) {
+  const profile = loadProfile(options);
 
-  memory.profile = {
-    ...memory.profile,
+  const updatedProfile = {
+    ...profile,
     ...newData
   };
 
-  saveMemory(memory);
-  return memory.profile;
+  return saveProfile(updatedProfile, options);
 }
 
-function updateSummary(newSummary) {
-  const memory = loadMemory();
-  memory.summary = newSummary;
-  saveMemory(memory);
-  return memory.summary;
+function updateProjectMemory(newData, options = {}) {
+  const projectMemory = loadProjectMemory(options);
+
+  const updatedProjectMemory = {
+    ...projectMemory,
+    ...newData
+  };
+
+  return saveProjectMemory(updatedProjectMemory, options);
 }
 
-function getFullMemory() {
-  return loadMemory();
+function updateSummary(newSummary, options = {}) {
+  const projectMemory = loadProjectMemory(options);
+  projectMemory.summary = newSummary;
+  saveProjectMemory(projectMemory, options);
+  return projectMemory.summary;
 }
 
-function getUserData() {
-  const memory = loadMemory();
-  return memory.profile;
+function getFullMemory(options = {}) {
+  const memory = loadMemory(options);
+
+  return {
+    profile: memory.profile,
+    projectMemory: memory.projectMemory,
+    chatMemory: memory.chatMemory,
+
+    // Compatibilidad temporal con tu localai.service.js actual
+    workingMemory: memory.chatMemory.workingMemory,
+    summary: memory.projectMemory.summary || ''
+  };
 }
 
-function getHistory() {
-  const memory = loadMemory();
+function getUserData(options = {}) {
+  return loadProfile(options);
+}
 
-  return memory.workingMemory.map(msg => ({
+function getHistory(options = {}) {
+  const chatMemory = loadChatMemory(options);
+
+  return chatMemory.workingMemory.map(msg => ({
     role: msg.role,
     content: msg.content
   }));
 }
 
-function detectUserData(message) {
-  const text = message.trim();
+function isTestOrExampleMessage(text) {
   const lowerText = text.toLowerCase();
 
-  const isTestOrExample =
+  return (
     lowerText.includes('ejemplo') ||
     lowerText.includes('por ejemplo') ||
     lowerText.includes('supongamos') ||
@@ -202,15 +344,47 @@ function detectUserData(message) {
     lowerText.includes('para pruebas') ||
     lowerText.includes('de prueba') ||
     lowerText.includes('usa el nombre') ||
-    lowerText.includes('ponle el nombre');
+    lowerText.includes('ponle el nombre')
+  );
+}
 
-  if (isTestOrExample) {
+function detectUserData(message, options = {}) {
+  const text = normalizeText(message);
+
+  if (!text || isTestOrExampleMessage(text)) {
     return;
+  }
+
+  const profile = loadProfile(options);
+  const projectMemory = loadProjectMemory(options);
+
+  const dislikePatterns = [
+    /no me gusta\s+(.+)/i,
+    /ya no me gusta\s+(.+)/i,
+    /no es cierto que me gusta\s+(.+)/i
+  ];
+
+  for (const pattern of dislikePatterns) {
+    const match = text.match(pattern);
+
+    if (match && match[1]) {
+      const value = normalizeText(match[1])
+        .replace(/^la\s+|^el\s+|^los\s+|^las\s+/i, '');
+
+      profile.likes = Array.isArray(profile.likes) ? profile.likes : [];
+
+      profile.likes = profile.likes.filter(
+        item => item.toLowerCase() !== value.toLowerCase()
+      );
+
+      saveProfile(profile, options);
+      return;
+    }
   }
 
   const namePatterns = [
     /me llamo\s+([a-záéíóúñ]+)/i,
-    /mi nombre es\s+([a-záéíóúñ]+)/i,
+    /mi nombre es\s+([a-záéíóúñ]+)/i
   ];
 
   const birthPlacePatterns = [
@@ -223,32 +397,43 @@ function detectUserData(message) {
     /soy\s+(mexicano|mexicana|español|española|argentino|argentina|colombiano|colombiana|chileno|chilena|peruano|peruana)/i
   ];
 
-  const memory = loadMemory();
+  const likePatterns = [
+    /me gusta\s+(.+)/i,
+    /me gustan\s+(.+)/i
+  ];
+
+  const goalPatterns = [
+    /quiero aprender\s+(.+)/i,
+    /quiero\s+(.+)/i,
+    /mi objetivo es\s+(.+)/i
+  ];
+
+  const preferencePatterns = [
+    /prefiero\s+(.+)/i,
+    /me gusta que respondas\s+(.+)/i
+  ];
+
+  const currentProjectPatterns = [
+    /estoy trabajando en\s+(.+)/i,
+    /trabajo en\s+(.+)/i,
+    /mi proyecto actual es\s+(.+)/i
+  ];
 
   for (const pattern of namePatterns) {
     const match = text.match(pattern);
 
     if (match && match[1]) {
-      const extractedName =
-        match[1].charAt(0).toUpperCase() + match[1].slice(1).toLowerCase();
+      const extractedName = capitalizeText(match[1]);
 
-      if (
-        memory.profile.name &&
-        memory.profile.name !== extractedName
-      ) {
-        const previousNames = Array.isArray(memory.profile.previousNames)
-          ? memory.profile.previousNames
+      if (profile.name && profile.name !== extractedName) {
+        profile.previousNames = Array.isArray(profile.previousNames)
+          ? profile.previousNames
           : [];
 
-        if (!previousNames.includes(memory.profile.name)) {
-          previousNames.push(memory.profile.name);
-        }
-
-        memory.profile.previousNames = previousNames;
+        addUnique(profile.previousNames, profile.name);
       }
 
-      memory.profile.name = extractedName;
-      saveMemory(memory);
+      profile.name = extractedName;
       break;
     }
   }
@@ -257,13 +442,7 @@ function detectUserData(message) {
     const match = text.match(pattern);
 
     if (match && match[1]) {
-      const extractedBirthPlace = match[1]
-        .trim()
-        .replace(/\s+/g, ' ')
-        .replace(/\b\w/g, char => char.toUpperCase());
-
-      memory.profile.birthPlace = extractedBirthPlace;
-      saveMemory(memory);
+      profile.birthPlace = capitalizeText(match[1]);
       break;
     }
   }
@@ -272,27 +451,216 @@ function detectUserData(message) {
     const match = text.match(pattern);
 
     if (match && match[1]) {
-      const extractedNationality =
-        match[1].trim().charAt(0).toUpperCase() +
-        match[1].trim().slice(1).toLowerCase();
-
-      memory.profile.nationality = extractedNationality;
-      saveMemory(memory);
+      profile.nationality = capitalizeText(match[1]);
       break;
     }
   }
+
+  for (const pattern of likePatterns) {
+    const match = text.match(pattern);
+
+    if (match && match[1]) {
+      profile.likes = Array.isArray(profile.likes) ? profile.likes : [];
+      addUnique(profile.likes, match[1]);
+      break;
+    }
+  }
+
+  for (const pattern of goalPatterns) {
+    const match = text.match(pattern);
+
+    if (match && match[1]) {
+      profile.goals = Array.isArray(profile.goals) ? profile.goals : [];
+      addUnique(profile.goals, match[1]);
+      break;
+    }
+  }
+
+  for (const pattern of preferencePatterns) {
+    const match = text.match(pattern);
+
+    if (match && match[1]) {
+      profile.preferences = Array.isArray(profile.preferences)
+        ? profile.preferences
+        : [];
+
+      addUnique(profile.preferences, match[1]);
+      break;
+    }
+  }
+
+  for (const pattern of currentProjectPatterns) {
+    const match = text.match(pattern);
+
+    if (match && match[1]) {
+      profile.currentProject = normalizeText(match[1]);
+
+      projectMemory.currentTasks = Array.isArray(projectMemory.currentTasks)
+        ? projectMemory.currentTasks
+        : [];
+
+      addUnique(projectMemory.currentTasks, match[1]);
+      break;
+    }
+  }
+
+  saveProfile(profile, options);
+  saveProjectMemory(projectMemory, options);
+}
+
+function listChats(options = {}) {
+  const paths = getPaths(options);
+  const fs = require('fs');
+
+  if (!fs.existsSync(paths.chatsDir)) return [];
+
+  return fs.readdirSync(paths.chatsDir)
+    .filter(file => file.endsWith('.json'))
+    .map(file => file.replace('.json', ''));
+}
+
+function createChat(chatId, options = {}) {
+  const newOptions = { ...options, chatId };
+  const chatMemory = getInitialChatMemory();
+
+  chatMemory.chatId = chatId;
+
+  saveChatMemory(chatMemory, newOptions);
+
+  return chatId;
+}
+
+function deleteChat(chatId, options = {}) {
+  const paths = getPaths({ ...options, chatId });
+  const fs = require('fs');
+
+  if (fs.existsSync(paths.chatFile)) {
+    fs.unlinkSync(paths.chatFile);
+  }
+}
+
+function listProjects(options = {}) {
+  const paths = getPaths(options);
+  const fs = require('fs');
+
+  const projectsDir = paths.projectsDir;
+
+  if (!fs.existsSync(projectsDir)) return [];
+
+  return fs.readdirSync(projectsDir);
+}
+
+function createProject(projectId, options = {}) {
+  const paths = getPaths({ ...options, projectId });
+  const fs = require('fs');
+
+  if (!fs.existsSync(paths.projectDir)) {
+    fs.mkdirSync(paths.projectDir, { recursive: true });
+  }
+
+  // crear memoria del proyecto
+  writeJson(paths.projectMemoryFile, {
+    ...getInitialProjectMemory(),
+    projectId,
+    name: projectId
+  });
+
+  // crear primer chat automáticamente
+  createChat('default', { ...options, projectId });
+
+  return projectId;
+}
+
+function deleteProject(projectId, options = {}) {
+  const paths = getPaths({ ...options, projectId });
+  const fs = require('fs');
+
+  if (fs.existsSync(paths.projectDir)) {
+    fs.rmSync(paths.projectDir, { recursive: true, force: true });
+  }
+}
+
+function renameChat(oldChatId, newChatId, options = {}) {
+  const oldPaths = getPaths({ ...options, chatId: oldChatId });
+  const newPaths = getPaths({ ...options, chatId: newChatId });
+
+  if (!fs.existsSync(oldPaths.chatFile)) {
+    throw new Error('El chat no existe');
+  }
+
+  if (fs.existsSync(newPaths.chatFile)) {
+    throw new Error('Ya existe un chat con ese nombre');
+  }
+
+  ensureDir(path.dirname(newPaths.chatFile));
+  fs.renameSync(oldPaths.chatFile, newPaths.chatFile);
+
+  const chatMemory = loadChatMemory({ ...options, chatId: newChatId });
+  chatMemory.chatId = newChatId;
+  chatMemory.title = newChatId;
+  saveChatMemory(chatMemory, { ...options, chatId: newChatId });
+
+  return newChatId;
+}
+
+function renameProject(oldProjectId, newProjectId, options = {}) {
+  const oldPaths = getPaths({ ...options, projectId: oldProjectId });
+  const newPaths = getPaths({ ...options, projectId: newProjectId });
+
+  if (!fs.existsSync(oldPaths.projectDir)) {
+    throw new Error('El proyecto no existe');
+  }
+
+  if (fs.existsSync(newPaths.projectDir)) {
+    throw new Error('Ya existe un proyecto con ese nombre');
+  }
+
+  ensureDir(path.dirname(newPaths.projectDir));
+  fs.renameSync(oldPaths.projectDir, newPaths.projectDir);
+
+  const projectMemory = loadProjectMemory({ ...options, projectId: newProjectId });
+  projectMemory.projectId = newProjectId;
+  projectMemory.name = newProjectId;
+  saveProjectMemory(projectMemory, { ...options, projectId: newProjectId });
+
+  return newProjectId;
 }
 
 module.exports = {
+  DEFAULT_USER_ID,
+  DEFAULT_PROJECT_ID,
+  DEFAULT_CHAT_ID,
+
   loadMemory,
   saveMemory,
+
+  loadProfile,
+  saveProfile,
+  loadProjectMemory,
+  saveProjectMemory,
+  loadChatMemory,
+  saveChatMemory,
+
   addMessage,
   getWorkingMemory,
   updateProfile,
+  updateProjectMemory,
   updateSummary,
   clearWorkingMemory,
   getFullMemory,
   detectUserData,
   getUserData,
-  getHistory
+  getHistory,
+  addChatHistoryMessage,
+  getChatHistory,
+  clearChatHistory,
+  listChats,
+  createChat,
+  deleteChat,
+  listProjects,
+  createProject,
+  deleteProject,
+  renameChat,
+  renameProject
+
 };

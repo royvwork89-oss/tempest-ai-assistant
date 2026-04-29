@@ -1,153 +1,331 @@
 const cleanReply = require('../utils/cleanReply');
 const memory = require('./memory.service');
 
-async function sendToLocalAI(message) {
-  // detectar datos del usuario
-  memory.detectUserData(message);
+const DEFAULT_MEMORY_OPTIONS = {
+  userId: memory.DEFAULT_USER_ID,
+  projectId: memory.DEFAULT_PROJECT_ID,
+  chatId: memory.DEFAULT_CHAT_ID
+};
 
-  // guardar mensaje del usuario
-  memory.addMessage('user', message);
-
-
-const fullMemory = memory.getFullMemory();
-  // obtener memoria completa
-const lowerMessage = message.toLowerCase();
-
-function getCleanSummary(summary) {
-  let clean = summary.replace('Datos del usuario: ', '');
-
-  const parts = clean.split('.').map(s => s.trim()).filter(Boolean);
-  const uniqueParts = [...new Set(parts)];
-
-  return uniqueParts
-    .map(p =>
-      p
-        .replace(/quiero/g, 'quieres')
-        .replace(/estoy/g, 'estás')
-    )
-    .join(', ') + '.';
+function normalizeQuestion(text) {
+  return String(text || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim();
 }
 
-// 🧠 RESPUESTAS CONTROLADAS POR BACKEND
+function formatList(items) {
+  if (!Array.isArray(items) || items.length === 0) {
+    return '';
+  }
 
-if (lowerMessage.includes('qué sabes de mí') || lowerMessage.includes('que sabes de mi')) {
-  return fullMemory.summary ? getCleanSummary(fullMemory.summary) : 'No tengo suficiente información aún.';
+  return items
+    .filter(Boolean)
+    .map(item => `- ${item}`)
+    .join('\n');
 }
 
-if (lowerMessage.includes('qué me gusta') || lowerMessage.includes('que me gusta')) {
-  return fullMemory.summary?.includes('me gusta')
-    ? getCleanSummary(fullMemory.summary)
-    : 'Aún no tengo información sobre tus gustos.';
+function getCurrentTimeAnswer(message) {
+  const question = normalizeQuestion(message);
+
+  const asksTime =
+    question.includes('que hora es') ||
+    question.includes('dime la hora') ||
+    question.includes('hora actual') ||
+    question.includes('dame la hora') ||   // ← AGREGA ESTA
+    question.includes('que hora');         // ← OPCIONAL (más flexible)
+
+  if (!asksTime) return null;
+
+  const now = new Date();
+
+  const time = now.toLocaleTimeString('es-MX', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true
+  });
+
+  return `Son las ${time}.`;
 }
 
-if (lowerMessage.includes('qué quiero') || lowerMessage.includes('que quiero')) {
-  return fullMemory.summary?.includes('quiero')
-    ? getCleanSummary(fullMemory.summary)
-    : 'Aún no tengo información sobre tus objetivos.';
+function buildProfileAnswer(profile) {
+  const parts = [];
+
+  if (profile.name) {
+    parts.push(`Te llamas ${profile.name}.`);
+  }
+
+  if (profile.birthPlace) {
+    parts.push(`Eres de ${profile.birthPlace}.`);
+  }
+
+  if (profile.nationality) {
+    parts.push(`Tu nacionalidad es ${profile.nationality}.`);
+  }
+
+  if (profile.currentProject) {
+    parts.push(`Actualmente trabajas en: ${profile.currentProject}.`);
+  }
+
+  if (Array.isArray(profile.likes) && profile.likes.length > 0) {
+    parts.push(`Te gusta:\n${formatList(profile.likes)}`);
+  }
+
+  if (Array.isArray(profile.goals) && profile.goals.length > 0) {
+    parts.push(`Tus objetivos son:\n${formatList(profile.goals)}`);
+  }
+
+  if (Array.isArray(profile.preferences) && profile.preferences.length > 0) {
+    parts.push(`Tus preferencias son:\n${formatList(profile.preferences)}`);
+  }
+
+  return parts.length > 0
+    ? parts.join('\n\n')
+    : 'No tengo suficiente información sobre ti todavía.';
 }
 
-if (lowerMessage.includes('en qué trabajo') || lowerMessage.includes('en que trabajo')) {
-  return fullMemory.summary?.includes('trabajando')
-    ? getCleanSummary(fullMemory.summary)
-    : 'No tengo información sobre tu trabajo.';
+function getControlledMemoryAnswer(message, fullMemory) {
+  const question = normalizeQuestion(message);
+  const profile = fullMemory.profile || {};
+  const projectMemory = fullMemory.projectMemory || {};
+
+  if (
+    question.includes('que sabes de mi') ||
+    question.includes('que sabes sobre mi')
+  ) {
+    return buildProfileAnswer(profile);
+  }
+
+  if (
+    question.includes('como me llamo') ||
+    question.includes('cual es mi nombre')
+  ) {
+    return profile.name
+      ? `Te llamas ${profile.name}.`
+      : 'Aún no tengo guardado tu nombre.';
+  }
+
+  if (
+    question.includes('de donde soy') ||
+    question.includes('donde naci') ||
+    question.includes('cual es mi lugar de nacimiento')
+  ) {
+    return profile.birthPlace
+      ? `Eres de ${profile.birthPlace}.`
+      : 'Aún no tengo guardado tu lugar de origen.';
+  }
+
+  if (
+    question.includes('que me gusta') ||
+    question.includes('cuales son mis gustos')
+  ) {
+    return Array.isArray(profile.likes) && profile.likes.length > 0
+      ? `Te gusta:\n${formatList(profile.likes)}`
+      : 'Aún no tengo información sobre tus gustos.';
+  }
+
+  if (
+    question.includes('que quiero') ||
+    question.includes('cuales son mis objetivos') ||
+    question.includes('que objetivos tengo')
+  ) {
+    return Array.isArray(profile.goals) && profile.goals.length > 0
+      ? `Tus objetivos son:\n${formatList(profile.goals)}`
+      : 'Aún no tengo información sobre tus objetivos.';
+  }
+
+  if (
+    question.includes('en que trabajo') ||
+    question.includes('en que estoy trabajando') ||
+    question.includes('cual es mi proyecto actual')
+  ) {
+    if (profile.currentProject) {
+      return `Actualmente trabajas en: ${profile.currentProject}.`;
+    }
+
+    if (
+      Array.isArray(projectMemory.currentTasks) &&
+      projectMemory.currentTasks.length > 0
+    ) {
+      return `Actualmente tienes estas tareas del proyecto:\n${formatList(projectMemory.currentTasks)}`;
+    }
+
+    return 'Aún no tengo información sobre tu trabajo o proyecto actual.';
+  }
+
+  if (
+    question.includes('como prefiero') ||
+    question.includes('mis preferencias') ||
+    question.includes('como quiero que respondas')
+  ) {
+    return Array.isArray(profile.preferences) && profile.preferences.length > 0
+      ? `Tus preferencias son:\n${formatList(profile.preferences)}`
+      : 'Aún no tengo información sobre tus preferencias.';
+  }
+
+  if (
+    question.includes('que sabes de tempest') ||
+    question.includes('que es tempest') ||
+    question.includes('estado del proyecto tempest')
+  ) {
+    const parts = [];
+
+    if (projectMemory.name) {
+      parts.push(`Proyecto: ${projectMemory.name}`);
+    }
+
+    if (Array.isArray(projectMemory.facts) && projectMemory.facts.length > 0) {
+      parts.push(`Datos del proyecto:\n${formatList(projectMemory.facts)}`);
+    }
+
+    if (Array.isArray(projectMemory.currentTasks) && projectMemory.currentTasks.length > 0) {
+      parts.push(`Tareas actuales:\n${formatList(projectMemory.currentTasks)}`);
+    }
+
+    if (projectMemory.summary) {
+      parts.push(`Resumen:\n${projectMemory.summary}`);
+    }
+
+    return parts.length > 0
+      ? parts.join('\n\n')
+      : 'Aún no tengo memoria suficiente sobre Tempest.';
+  }
+
+  return null;
 }
 
+function buildSystemPrompt(fullMemory) {
+  const profile = fullMemory.profile || {};
+  const projectMemory = fullMemory.projectMemory || {};
 
-if (
-  lowerMessage === 'hola' ||
-  lowerMessage === 'buenas' ||
-  lowerMessage === 'hey'
-) {
-  return `Hola Rogelio, ¿en qué puedo ayudarte?`;
-}
+  return `
+Eres Tempest, una IA local conversacional.
 
-const dynamicSystemPrompt = `
-Eres Tempest, una IA local con memoria activa.
+REGLAS PRINCIPALES:
+- Responde en español.
+- Responde natural, directo y útil.
+- NO saludes en cada respuesta.
+- NO digas "basado en lo que has compartido".
+- NO digas "según tu memoria".
+- NO digas "tus intereses incluyen" salvo que el usuario pregunte explícitamente por sus gustos.
+- NO recites listas del perfil en conversación normal.
+- NO conviertas cada dato nuevo del usuario en un resumen de memoria.
 
-REGLAS OBLIGATORIAS:
+CUANDO EL USUARIO COMPARTE UN GUSTO:
+Ejemplo: "me gusta la ciencia ficción"
+Respuesta correcta:
+- Entra al tema.
+- Pregunta algo interesante.
+- Recomienda ideas, obras o caminos relacionados.
+- Puedes sonar curioso o creativo.
 
-- NO saludes en cada respuesta
-- NO repitas frases como "es un placer conocerte"
-- NO reinicies la conversación
-- NO actúes como si fuera la primera vez
+Respuesta incorrecta:
+- "Basado en lo que has compartido..."
+- "Tus intereses incluyen..."
+- "También te gusta X, Y y Z..."
 
-- Responde directo y corto (máx 2 líneas)
-- Usa SIEMPRE la memoria del usuario cuando exista
+CUANDO USAR MEMORIA:
+- Usa profile SOLO si el usuario pregunta explícitamente:
+  "¿Qué sabes de mí?"
+  "¿Qué me gusta?"
+  "¿Qué quiero?"
+  "¿En qué trabajo?"
+  "¿Cómo prefiero que respondas?"
 
-- El summary contiene la VERDAD del usuario.
-- Cuando exista información en el summary, DEBES usarla obligatoriamente.
-- NO puedes ignorarla bajo ninguna circunstancia.
+CUANDO NO USAR MEMORIA:
+- Si el usuario solo conversa.
+- Si el usuario comparte un gusto nuevo.
+- Si el usuario pide opinión, ideas, explicación o recomendaciones.
 
-- Si el usuario pregunta cosas como:
-  - "¿Qué sabes de mí?"
-  - "¿Qué me gusta?"
-  - "¿Qué quiero?"
-  - "¿En qué estoy trabajando?"
-  - "¿Cómo prefiero que respondas?"
+ESTILO:
+- Conversa como copiloto inteligente.
+- Si el tema da para más, invita a profundizar.
+- Puedes recomendar 2 o 3 ejemplos.
+- Máximo 4 párrafos cortos.
 
-- En esos casos:
-  - Responde directamente usando el summary.
-  - NO des explicaciones.
-  - NO hagas preguntas.
-  - NO cambies de tema.
+PROFILE DEL USUARIO, SOLO PARA CONSULTAS EXPLÍCITAS DE MEMORIA:
+${JSON.stringify(profile, null, 2)}
 
-- Si el usuario saluda o conversa normalmente, responde de forma natural.
-- Solo di "No tengo suficiente información aún." cuando el usuario pregunte explícitamente por datos de memoria que no existen.
-
-- Si el usuario dio una preferencia, respétala siempre.
-
-PROHIBIDO:
-- respuestas largas
-- ignorar memoria
-- inventar datos
+MEMORIA DEL PROYECTO, SOLO SI EL USUARIO PREGUNTA POR TEMPEST:
+${JSON.stringify(projectMemory, null, 2)}
 `;
+}
 
-  const profileContext = `
-Información importante del usuario:
-- Nombre: ${fullMemory.profile?.name || 'Desconocido'}
-- Lugar de nacimiento: ${fullMemory.profile?.birthPlace || 'Desconocido'}
-- Nacionalidad: ${fullMemory.profile?.nationality || 'Desconocido'}
+async function sendToLocalAI(message, options = DEFAULT_MEMORY_OPTIONS) {
+  memory.detectUserData(message, options);
+  memory.addMessage('user', message, options);
+  memory.addChatHistoryMessage('user', message, options);
 
-Usa SIEMPRE esta información como la fuente principal de verdad.
-Si hay conflicto con el historial, IGNORA el historial.
-`;
+  const fullMemory = memory.getFullMemory(options);
 
-  const summaryContext = `
-Resumen acumulado de la conversación:
-${fullMemory.summary || 'Sin resumen todavía.'}
-`;
+  const timeAnswer = getCurrentTimeAnswer(message);
+
+  if (timeAnswer) {
+    memory.addChatHistoryMessage('assistant', timeAnswer, options);
+    return timeAnswer;
+  }
+
+  const controlledAnswer = getControlledMemoryAnswer(message, fullMemory);
+
+  if (controlledAnswer) {
+    memory.addChatHistoryMessage('assistant', controlledAnswer, options);
+    return controlledAnswer;
+  }
+
+  const lowerMessage = message.toLowerCase().trim();
+
+  if (
+    lowerMessage === 'hola' ||
+    lowerMessage === 'buenas' ||
+    lowerMessage === 'hey'
+  ) {
+    const name = fullMemory.profile?.name || 'Rogelio';
+    const greeting = `Hola ${name}, ¿en qué puedo ayudarte?`;
+
+    memory.addChatHistoryMessage('assistant', greeting, options);
+    return greeting;
+  }
+
+
+  const history = memory.getHistory(options).filter(msg => {
+    const text = msg.content.toLowerCase();
+
+    if (
+      msg.role === 'user' &&
+      (
+        text.includes('me gusta') ||
+        text.includes('quiero') ||
+        text.includes('estoy trabajando')
+      )
+    ) {
+      return false;
+    }
+
+    if (
+      msg.role === 'assistant' &&
+      (
+        text.includes('no tengo memoria') ||
+        text.includes('basado en lo que') ||
+        text.trim() === ''
+      )
+    ) {
+      return false;
+    }
+
+    return true;
+  });
 
   const messages = [
     {
       role: 'system',
-      content: dynamicSystemPrompt + '\n' + profileContext + '\n' + summaryContext
+      content: buildSystemPrompt(fullMemory)
     },
-    ...memory.getHistory().filter(msg => {
-      const text = msg.content.toLowerCase();
-
-      // eliminar mensajes viejos de identidad del usuario
-      if (
-        msg.role === 'user' &&
-        (text.includes('me llamo') || text.includes('mi nombre es'))
-      ) {
-        return false;
-      }
-
-      // eliminar respuestas malas del assistant
-      if (
-          msg.role === 'assistant' &&
-          (
-            text.includes('no tengo memoria') ||
-            text.includes('no tengo suficiente información') ||
-            text.trim() === '//' ||
-            text.trim() === ''
-          )
-        ) {
-          return false;
-        }
-
-      return true;
-    })
+    ...history,
+    {
+      role: 'user',
+      content: message
+    }
   ];
 
   console.log('HISTORIAL ENVIADO A LOCALAI:', messages);
@@ -161,7 +339,7 @@ ${fullMemory.summary || 'Sin resumen todavía.'}
       model: 'hermes-q4',
       stream: false,
       temperature: 0,
-      max_tokens: 120,
+      max_tokens: 160,
       messages
     })
   });
@@ -182,13 +360,50 @@ ${fullMemory.summary || 'Sin resumen todavía.'}
   reply = cleanReply(reply);
 
   if (!reply) {
-    reply = 'Hola, ¿en qué puedo ayudarte?';
+    reply = 'No pude generar una respuesta válida.';
   }
 
-  // guardar respuesta válida
-  memory.addMessage('assistant', reply);
+  memory.addChatHistoryMessage('assistant', reply, options);
 
   return reply;
 }
 
-module.exports = { sendToLocalAI };
+async function generateTitleFromText(text, type = 'chat') {
+  const prompt = `
+Genera un título corto en español para un ${type}.
+Debe tener máximo 5 palabras.
+No uses comillas.
+No expliques nada.
+Texto base: ${text}
+`;
+
+  const response = await fetch('http://127.0.0.1:8080/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'hermes-q4',
+      stream: false,
+      temperature: 0.2,
+      max_tokens: 30,
+      messages: [
+        { role: 'user', content: prompt }
+      ]
+    })
+  });
+
+  const data = await response.json();
+
+  const title = data.choices?.[0]?.message?.content || 'Nuevo chat';
+
+  return title
+    .replace(/[\\/:*?"<>|]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 50);
+}
+
+module.exports = 
+{ 
+  sendToLocalAI,
+  generateTitleFromText 
+};

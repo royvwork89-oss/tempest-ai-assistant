@@ -1,10 +1,21 @@
-# 🧩 Tempest - Tareas Pendientes
+# 🧩 Tempest - Roadmap
 
 ## 🚧 Estado actual
-Versión actual: v0.3.0 
+
+Versión actual: v0.3.0+
+
 Sistema funcional con:
+
 - Chat local con IA
-- Memoria básica
+- LocalAI como motor principal
+- Memoria por usuario/proyecto/chat
+- Chats independientes
+- Proyectos con múltiples chats
+- Sidebar tipo workspace
+- Renombrar y eliminar chats/proyectos
+- Modal de confirmación para eliminar
+- Creación de proyectos con nombre manual
+- Renombrado automático de chats con IA
 - Transcripción de audio
 - Exportación TXT, PDF y DOCX
 - Menú de herramientas (+)
@@ -13,89 +24,91 @@ Sistema funcional con:
 
 ## 🔥 Prioridad alta
 
-### 🧠 Mejora del chat
-- [ ] Mejorar coherencia en respuestas
-- [ ] Evitar respuestas repetitivas
-- [ ] Mejorar uso de memoria (summary)
-- [ ] Ajustar prompt dinámico
-
 ### 🧠 Memoria
+
 - [ ] Mejorar detección de datos importantes
-- [ ] Evitar duplicados en summary
-- [ ] Separar memoria a largo y corto plazo
-- [ ] Añadir limpieza automática de memoria
+- [ ] Evitar duplicados en perfil/memoria
+- [ ] Añadir resumen automático por chat
+- [ ] Añadir resumen automático por proyecto
+- [ ] Separar memoria corta y larga de forma más estricta
+- [ ] Limpiar historial viejo sin perder resumen
+
+### 🧩 Proyectos y chats
+
+- [ ] Validar nombres para evitar caracteres inválidos
+- [ ] Evitar nombres duplicados de chats/proyectos
+- [ ] Mejorar renombrado automático de chats
+- [ ] Permitir renombrado automático opcional de proyectos
+- [ ] Añadir opción de cancelar creación de chat pendiente
+- [ ] Mejorar visual de proyecto activo/chat activo
+- [ ] Guardar estado de proyecto colapsado/expandido en localStorage
+
+### 🧾 UI/UX
+
+- [ ] Reemplazar `prompt()` de renombrar por modal propio
+- [ ] Añadir modal de error visual
+- [ ] Añadir loader animado de respuesta
+- [ ] Añadir confirmación visual al renombrar
+- [ ] Mejorar diseño de menú de tres puntos
+- [ ] Mejorar diseño móvil
 
 ---
 
 ## ⚙️ Transcripción de audio
 
 - [ ] Implementar corte por silencio real (VAD)
-- [ ] Mejorar manejo de errores en fragmentos
+- [ ] Mejorar manejo de errores por fragmento
 - [ ] Optimizar tiempo de procesamiento
 - [ ] Permitir elegir idioma del audio
-- [ ] Usar mode + format correctamente 
-- [ ] Devolver filePath (ruta Windows)
-- [ ] Permitir análisis manual de transcripción (pendiente)
-
+- [ ] Limpiar automáticamente uploads/audio
+- [ ] Limpiar automáticamente uploads/chunks
+- [ ] Añadir análisis automático de transcripción
+- [ ] Enviar transcripción al chat como contexto opcional
 
 ---
 
-## 📄 Archivos y exportación
+## 📄 Exportación
 
 - [ ] Mejorar formato de PDF
-- [ ] Mejorar formato de Word (DOCX)
-- [ ] Añadir opción de descarga directa desde frontend
-- [ ] Permitir elegir solo el formato necesario (no generar todos)
-
----
-
-## 🧰 Sistema de herramientas
-
-- [ ] Activar "Añadir archivo para lectura"
-- [ ] Activar "Crear imagen"
-- [ ] Activar "Crear video"
-- [ ] Mejorar UX del menú (+)
+- [ ] Mejorar formato DOCX
+- [ ] Añadir descarga directa desde frontend
+- [ ] Permitir elegir solo un formato de salida
+- [ ] Añadir nombres de archivo más descriptivos
 
 ---
 
 ## 🤖 Integración IA
 
-- [ ] Conectar transcripción → análisis automático con IA
-- [ ] Permitir analizar archivos subidos
-- [ ] Crear modo “transcripción + resumen”
-- [ ] Enviar texto transcrito al chat automáticamente (modo futuro)
-
-
----
-
-## 🖥️ Frontend
-
-- [ ] Mejorar UI del chat
-- [ ] Añadir loader visual en transcripción
-- [ ] Mejorar manejo de errores visibles al usuario
-- [ ] Mostrar progreso de transcripción
+- [ ] Mejorar prompt del generador de títulos
+- [ ] Añadir selección automática de modelo
+- [ ] Añadir modo híbrido local + API externa
+- [ ] Añadir análisis de archivos
+- [ ] Añadir herramientas nuevas al menú +
 
 ---
 
 ## 🧪 Testing
 
-- [ ] Pruebas de endpoints (/chat, /transcribe)
-- [ ] Manejo de errores en backend
-- [ ] Validación de archivos subidos
+- [ ] Probar `/chat`
+- [ ] Probar `/chat/history`
+- [ ] Probar `/chat/create`
+- [ ] Probar `/chat/rename`
+- [ ] Probar `/chat/delete`
+- [ ] Probar `/project/create`
+- [ ] Probar `/project/rename`
+- [ ] Probar `/project/delete`
+- [ ] Probar `/title/generate`
+- [ ] Probar `/transcribe`
 
 ---
 
-## 🚀 Futuro (largo plazo)
+## 🚀 Futuro
 
-- [ ] Versión desktop con Electron
-- [ ] App móvil conectada al backend
-- [ ] Sistema de usuarios
-- [ ] Persistencia avanzada de memoria
-- [ ] Integración con APIs externas
+- [ ] Migrar JSON a SQLite/PostgreSQL
+- [ ] Añadir sistema de login
+- [ ] Añadir múltiples usuarios reales
+- [ ] Añadir búsqueda semántica con embeddings
+- [ ] Añadir app desktop con Electron
+- [ ] Añadir sincronización opcional
+- [ ] Añadir respaldo/exportación de memoria
 
----
-
-## 🧠 Nota
-
-Este proyecto está en desarrollo activo.  
-Las tareas pueden cambiar conforme evoluciona la arquitectura.

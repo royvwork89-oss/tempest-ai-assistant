@@ -2,194 +2,255 @@
 
 ## 🧩 Visión general
 
-El sistema sigue una arquitectura cliente-servidor:
+Tempest es un asistente local de IA con arquitectura cliente-servidor, frontend web, backend Node.js/Express, motor LocalAI y persistencia basada en archivos JSON.
 
-Usuario → Frontend → Backend → Motor IA → Backend → Frontend
+```text
+Usuario → Frontend → Backend → Memoria/Servicios → LocalAI → Backend → Frontend
+```
+
+El sistema ya no funciona como un chat único. Ahora maneja conversaciones organizadas por usuario, proyectos y chats independientes.
 
 ---
 
-## 🔧 Componentes
+## 🔧 Componentes principales
 
 ### Frontend
 
-* Interfaz de usuario
-* Manejo de eventos
-* Renderizado de mensajes
-* Comunicación con backend vía HTTP (fetch)
+- Interfaz de chat tipo ChatGPT.
+- Sidebar con chats independientes y proyectos.
+- Menú de modelos locales y servicios externos.
+- Menú de herramientas con transcripción de audio.
+- Modales para transcripción, eliminación y creación de proyectos.
+- Estado activo del chat mediante `chatState.js`.
+- Comunicación HTTP con el backend mediante `fetch`.
 
 ### Backend
 
-* API REST (/chat)
-* Validación de entrada
-* Orquestación de servicios
-* Comunicación con LocalAI
-* Manejo de memoria
+- API REST con Express.
+- Controladores para chat y transcripción.
+- Servicios separados para LocalAI, memoria y transcripción.
+- Persistencia por archivos JSON.
+- Endpoints para crear, listar, renombrar y eliminar chats/proyectos.
+- Endpoint para generación automática de títulos.
 
 ### Motor IA
 
-* Modelo de lenguaje ejecutado localmente (LocalAI)
-* Generación de respuestas
+- LocalAI ejecutando modelos GGUF para chat.
+- Modelo Whisper vía LocalAI para transcripción de audio.
+- Generación auxiliar de títulos cortos para chats.
 
 ---
 
-## ⚙️ Principios
+## 🧠 Sistema multi-contexto
 
-* Separación de responsabilidades
-* Bajo acoplamiento
-* Escalabilidad
-* Modularidad
+Tempest organiza la información en tres niveles:
+
+```text
+Usuario
+└── Proyecto
+    └── Chat
+```
+
+### Reglas principales
+
+- Cada usuario tiene su propia memoria global.
+- Cada proyecto tiene su propia memoria de proyecto.
+- Cada chat tiene su propio historial y memoria de trabajo.
+- Un chat no puede leer el historial de otro chat.
+- Un chat dentro de proyecto puede acceder a:
+  - su propia memoria de chat
+  - la memoria del proyecto
+  - la memoria global del usuario
+- Un chat sin proyecto pertenece al proyecto especial `general`.
 
 ---
 
-## 📦 Estructura del proyecto (Mapa real)
+## 📦 Estructura real del proyecto
 
-```md
 ```text
 Tempest/
 ├── backend/
 │   ├── config/
-│   │   └── systemPrompt.js                 # Prompt base del sistema
+│   │   └── systemPrompt.js
 │   ├── controllers/
-│   │   ├── chat.controller.js              # Maneja la lógica de /chat
-│   │   └── transcription.controller.js     # Maneja la lógica de /transcribe
+│   │   ├── chat.controller.js
+│   │   └── transcription.controller.js
 │   ├── data/
-│   │   └── memory.json                     # Memoria persistente
+│   │   └── users/
+│   │       └── local-user/
+│   │           ├── profile.json
+│   │           └── projects/
+│   │               ├── general/
+│   │               │   ├── projectMemory.json
+│   │               │   └── chats/
+│   │               │       └── chat-name.json
+│   │               └── project-name/
+│   │                   ├── projectMemory.json
+│   │                   └── chats/
+│   │                       └── chat-name.json
 │   ├── outputs/
-│   │   └── transcriptions/                 # Archivos generados: TXT, PDF, DOCX
+│   │   └── transcriptions/
 │   ├── routes/
-│   │   ├── chat.routes.js                  # Define endpoint /chat
-│   │   └── transcription.routes.js         # Define endpoint /transcribe
+│   │   ├── chat.routes.js
+│   │   └── transcription.routes.js
 │   ├── services/
-│   │   ├── localai.service.js              # Comunicación con LocalAI para chat
-│   │   ├── memory.service.js               # Gestión de memoria
-│   │   └── transcription.service.js        # Transcripción, chunks, PDF/DOCX
+│   │   ├── localai.service.js
+│   │   ├── memory.service.js
+│   │   └── transcription.service.js
 │   ├── uploads/
-│   │   ├── audio/                          # Audios temporales subidos
-│   │   └── chunks/                         # Fragmentos temporales generados por ffmpeg
+│   │   ├── audio/
+│   │   └── chunks/
 │   ├── utils/
-│   │   └── cleanReply.js                   # Limpieza de respuestas
-│   └── server.js                           # Punto de entrada del backend
+│   │   └── cleanReply.js
+│   └── server.js
 │
 ├── frontend/
-│   ├── index.html                          # UI principal, menú + y modal
-│   ├── app.js                              # Lógica del chat y herramientas
-│   ├── api.js                              # Conexión con /chat y /transcribe
-│   ├── ui.js                               # Renderizado de mensajes y links
-│   └── styles.css                          # Estilos
+│   ├── index.html
+│   ├── app.js
+│   ├── api.js
+│   ├── chatState.js
+│   ├── ui.js
+│   └── styles.css
 │
 └── docker/
 ```
 
 ---
 
-## 🔄 Flujo interno entre archivos
-
-El flujo real del mensaje dentro del backend es:
+## 🔄 Flujo interno de chat
 
 ```text
-Frontend (app.js)
-   ↓
-POST /chat
-   ↓
+frontend/app.js
+↓
+api.js → POST /chat
+↓
 routes/chat.routes.js
-   ↓
+↓
 controllers/chat.controller.js
-   ↓
+↓
 services/localai.service.js
-   ↓
+↓
 services/memory.service.js
-   ↓
-LocalAI (modelo)
-   ↓
-Respuesta
-   ↓
-Frontend
+↓
+LocalAI
+↓
+Respuesta guardada en memoria
+↓
+Frontend renderiza mensaje
 ```
 
 ---
 
-## 🧠 Responsabilidad por módulo
+## 🧭 Sidebar y organización visual
 
-### routes/
+La UI permite trabajar con:
 
-Define endpoints y conecta con controladores.
+```text
++ Nuevo Chat
+chat independiente
+chat independiente
 
-### controllers/
++ Nuevo Proyecto
+▸ proyecto cerrado
+▾ proyecto abierto
+   + Nuevo chat
+   chat del proyecto
+```
 
-* Recibe request
-* Valida datos
-* Llama servicios
-* Devuelve respuesta
+### Comportamiento
 
-### services/
-
-Contienen la lógica principal del sistema:
-
-* localai.service → habla con la IA
-* memory.service → gestiona memoria
-
-### config/
-
-Configuraciones globales como el prompt del sistema.
-
-### data/
-
-Persistencia en JSON (memoria e historial).
-
-### utils/
-
-Funciones auxiliares (ej. limpieza de texto).
+- Los proyectos inician colapsados al refrescar.
+- Al expandir un proyecto se muestran sus chats.
+- Al seleccionar un chat se marca visualmente como activo.
+- Si el proyecto está colapsado, se marca el proyecto activo.
+- Cada chat/proyecto tiene menú de tres puntos:
+  - Renombrar
+  - Eliminar
 
 ---
 
-## 📌 Estado actual de la arquitectura
+## 🧠 Creación inteligente de chats
 
-El sistema está en una fase modular inicial con:
+### Nuevo chat sin proyecto
 
-* arquitectura clara separada por capas
-* memoria básica persistente
-* integración funcional con LocalAI
-* frontend conectado correctamente al backend
+1. Usuario presiona `+ Nuevo Chat`.
+2. Se muestra pantalla inicial: “¿En qué puedo ayudarte?”
+3. No se crea archivo todavía.
+4. Al enviar el primer mensaje:
+   - se crea chat en `general`
+   - se envía el mensaje a la IA
+   - la IA genera un título corto
+   - el chat se renombra automáticamente
 
-Preparado para evolucionar hacia:
+### Nuevo chat dentro de proyecto
 
-* múltiples modelos
-* memoria avanzada (resumen, embeddings)
-* base de datos real (MongoDB, PostgreSQL)
-* autenticación de usuarios
-* sistema multiusuario
+1. Usuario expande un proyecto.
+2. Presiona `+ Nuevo chat`.
+3. Se muestra pantalla inicial.
+4. Al enviar el primer mensaje:
+   - se crea chat dentro del proyecto
+   - la IA genera un nombre basado en la consulta
+   - el chat se renombra automáticamente
+
+### Nuevo proyecto
+
+1. Usuario presiona `+ Nuevo Proyecto`.
+2. Se abre modal para escribir el nombre del proyecto.
+3. Al aceptar, se crea el proyecto.
+4. Se muestra pantalla inicial.
+5. El primer mensaje crea y renombra el primer chat dentro de ese proyecto.
 
 ---
 
-## 🎙️ Sistema de Transcripción de Audio
+## 🧾 Endpoints principales
 
-Se ha integrado un nuevo módulo para procesamiento de audio y generación de archivos.
+```text
+POST /chat
+GET  /chat/history
+GET  /chats
+POST /chat/create
+POST /chat/delete
+POST /chat/rename
+GET  /projects
+POST /project/create
+POST /project/delete
+POST /project/rename
+POST /title/generate
+POST /transcribe
+```
 
-### Componentes involucrados
+---
 
-- routes/transcription.routes.js → endpoint `/transcribe`
-- controllers/transcription.controller.js → manejo de request
-- services/transcription.service.js → lógica principal
-- outputs/transcriptions/ → almacenamiento de archivos generados
+## 🎙️ Sistema de transcripción de audio
+
+### Componentes
+
+- `routes/transcription.routes.js`
+- `controllers/transcription.controller.js`
+- `services/transcription.service.js`
+- `uploads/audio/`
+- `uploads/chunks/`
+- `outputs/transcriptions/`
 
 ### Funcionalidad
 
-- División de audio en fragmentos (ffmpeg)
-- Transcripción usando modelo Whisper (LocalAI)
-Generación de archivos basada en selección del usuario:
-- TXT (plano o timestamps)
-- PDF (plano o timestamps)
-- DOCX (plano o timestamps)
+- Carga de audio desde frontend.
+- División del audio en fragmentos con ffmpeg.
+- Transcripción con Whisper vía LocalAI.
+- Generación de archivos:
+  - TXT
+  - PDF
+  - DOCX
+- Limpieza automática esperada de archivos temporales.
 
-### Integración frontend
+---
 
-- Modal de transcripción
-- Menú de herramientas (+)
-- Selección de tipo de texto y formato
+## ⚙️ Principios arquitectónicos
 
-### Dependencias del sistema de transcripción
+- Separación de responsabilidades.
+- Backend modular.
+- Frontend organizado por módulos.
+- Persistencia simple y depurable.
+- Preparado para migrar a base de datos.
+- Preparado para sistema multiusuario real.
 
-- ffmpeg → procesamiento de audio
-- LocalAI (Whisper) → transcripción
-- pdfkit → generación de PDF
-- docx → generación de archivos Word
