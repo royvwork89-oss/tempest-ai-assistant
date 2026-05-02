@@ -2,7 +2,7 @@
 
 ## 🚧 Estado actual
 
-Versión actual: v0.3.3
+Versión actual: v0.3.4
 
 Sistema funcional con:
 
@@ -105,8 +105,8 @@ Sistema funcional con:
 - [ ] Añadir modo híbrido local + API externa
 - [ ] Añadir análisis de archivos
 - [ ] Añadir herramientas nuevas al menú +
-- [ ] Implementar cambio real de modelo desde el menú de modelos
-- [ ] Implementar selección automática de modelo según la consulta del usuario
+- [x] Implementar cambio real de modelo desde el menú de modelos
+- [x] Implementar selección automática de modelo según la consulta del usuario
 - [ ] Mejorar la lógica para que la IA separe correctamente múltiples bloques de código
 - [ ] Forzar formato de salida cuando la IA genere varios archivos de código
 - [ ] Mostrar en el chat cuándo inicia y cuándo termina una transcripción

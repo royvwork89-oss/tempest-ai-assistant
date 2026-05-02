@@ -47,17 +47,20 @@ let pendingDelete = null;
 let pendingBulkDelete = null;
 
 
-const HARDWARE_PROFILE = 'laptop'; 
+const HARDWARE_PROFILE = 'laptop';
 // laptop  = RTX 4050
 // desktop = RTX 4070
+const APP_MODE = 'dev';
+// dev  = muestra detalles técnicos
+// prod = oculta detalles técnicos
 
 const MODEL_PROFILES = {
-laptop: [
-  { model: 'qwen2.5-3b-q4', label: 'Qwen 2.5 3B Q4 - Rápido' },
-  { model: 'qwen2.5-3b-q5', label: 'Qwen 2.5 3B Q5 - Equilibrado' },
-  { model: 'hermes-q4', label: 'Hermes 8B Q4 - Inteligente' },
-  { model: 'auto', label: 'Automático' }
-],
+  laptop: [
+    { model: 'qwen2.5-3b-q4', label: 'Qwen 2.5 3B Q4 - Rápido' },
+    { model: 'qwen2.5-3b-q5', label: 'Qwen 2.5 3B Q5 - Equilibrado' },
+    { model: 'hermes-q4', label: 'Hermes 8B Q4 - Inteligente' },
+    { model: 'auto', label: 'Automático' }
+  ],
 
   desktop: [
     { model: 'hermes-q4', label: 'Hermes Q4 - Rápido' },
@@ -122,7 +125,15 @@ function getLabel(model) {
 }
 
 function updateMenuTriggerLabel() {
-  let label = `modelo: ${getLabel(primaryModel)}`;
+  let label = '';
+
+  if (primaryModel === 'auto') {
+    label = APP_MODE === 'dev'
+      ? 'modo: Automático local'
+      : 'modo: Automático';
+  } else {
+    label = `modelo: ${getLabel(primaryModel)}`;
+  }
 
   const activeServices = [];
 
@@ -271,6 +282,40 @@ const transcriptionFormat = document.getElementById('transcriptionFormat');
 const cancelTranscriptionBtn = document.getElementById('cancelTranscriptionBtn');
 const processTranscriptionBtn = document.getElementById('processTranscriptionBtn');
 
+function selectAutomaticLocalModel(message) {
+  const text = String(message || '').toLowerCase();
+  console.log('Texto analizado por automático:', text);
+
+  const isComplex =
+    text.includes('código') ||
+    text.includes('codigo') ||
+    text.includes('express') ||
+    text.includes('mysql') ||
+    text.includes('backend') ||
+    text.includes('arquitectura') ||
+    text.includes('paso a paso') ||
+    text.includes('explica') ||
+    text.length > 180;
+
+  const isMedium =
+    text.length > 80 ||
+    text.includes('ejemplo') ||
+    text.includes('comparar') ||
+    text.includes('recomienda') ||
+    text.includes('cómo') ||
+    text.includes('como');
+
+  if (isComplex) {
+    return 'hermes-q4';
+  }
+
+  if (isMedium) {
+    return 'qwen2.5-3b-q5';
+  }
+
+  return 'qwen2.5-3b-q4';
+}
+
 function getAssistants() {
   return [
     {
@@ -394,7 +439,7 @@ function autoResizeUserInput() {
     userInput.scrollHeight > maxHeight ? 'auto' : 'hidden';
 }
 
-userInput.addEventListener('input', autoResizeUserInput); 
+userInput.addEventListener('input', autoResizeUserInput);
 
 renderWelcomeScreen();
 
@@ -470,11 +515,20 @@ async function sendMessage() {
 
   await ensureGeneralChatExists();
 
+  const selectedModel =
+    primaryModel === 'auto'
+      ? selectAutomaticLocalModel(message)
+      : primaryModel;
+
   const config = {
-    primaryModel,
+    primaryModel: selectedModel,
     assistants: getAssistants()
   };
 
+  console.log('Modelo seleccionado por Tempest:', selectedModel);
+  if (primaryModel === 'auto' && APP_MODE === 'dev') {
+    menuTrigger.textContent = `modo: Automático local · usando ${getLabel(selectedModel)}`;
+  }
   addMessage(chatBox, 'Tú', message);
   userInput.value = '';
   autoResizeUserInput();
@@ -607,11 +661,11 @@ function createActionsMenu({ type, id, projectId }) {
 
 
 
-  cancelDeleteBtn.onclick = () => {
-    pendingDelete = null;
-    pendingBulkDelete = null;
-    deleteConfirmModal.classList.add('hidden');
-  };
+cancelDeleteBtn.onclick = () => {
+  pendingDelete = null;
+  pendingBulkDelete = null;
+  deleteConfirmModal.classList.add('hidden');
+};
 
 confirmDeleteBtn.onclick = async () => {
   if (pendingBulkDelete) {
@@ -806,8 +860,8 @@ async function loadProjects() {
 
     projectActions.classList.add('project-actions');
 
-projectTitle.appendChild(arrow);
-projectTitle.appendChild(projectActions);
+    projectTitle.appendChild(arrow);
+    projectTitle.appendChild(projectActions);
 
     const projectChats = document.createElement('div');
     projectChats.className = 'project-chats';

@@ -14,6 +14,14 @@ Tempest es un asistente local de IA construido con Node.js, Express, LocalAI y f
 - Chats agrupados por proyecto.
 - Historial persistente por chat.
 
+### 🧠 Selección de modelos locales
+
+- Selector dinámico de modelos desde el frontend.
+- Soporte para múltiples perfiles de hardware (laptop / desktop).
+- Integración con LocalAI mediante nombres reales de modelo.
+- Cambio de modelo en tiempo real por chat.
+- Preparado para selección automática de modelo.
+
 ### 🧠 Sistema de memoria
 
 - Memoria global de usuario.
@@ -184,7 +192,7 @@ http://localhost:3005
 
 ## 🧠 Estado del proyecto
 
-Versión actual: **v0.3.2**
+Versión actual: **v0.3.4**
 
 Tempest ya cuenta con:
 
