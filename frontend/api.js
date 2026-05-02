@@ -1,21 +1,20 @@
-import { getMemoryPayload, getMemoryQuery } from './chatState.js';
+import { getMemoryQuery, getChatState } from './chatState.js';
 
-export async function sendChatMessage(message, config) {
-  const response = await fetch('/chat', {
+export async function sendChatMessage(message, config = {}) {
+  const state = getChatState();
+
+  const res = await fetch('/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       message,
-      ...config,
-      ...getMemoryPayload()
+      projectId: state.projectId,
+      chatId: state.chatId,
+      config
     })
   });
 
-  if (!response.ok) {
-    throw new Error('Error en la API');
-  }
-
-  return response.json();
+  return res.json();
 }
 
 export async function getChatHistory() {

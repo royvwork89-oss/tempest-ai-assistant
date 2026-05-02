@@ -47,7 +47,28 @@ let pendingDelete = null;
 let pendingBulkDelete = null;
 
 
-let primaryModel = 'hermes-q4';
+const HARDWARE_PROFILE = 'laptop'; 
+// laptop  = RTX 4050
+// desktop = RTX 4070
+
+const MODEL_PROFILES = {
+laptop: [
+  { model: 'qwen2.5-3b-q4', label: 'Qwen 2.5 3B Q4 - Rápido' },
+  { model: 'qwen2.5-3b-q5', label: 'Qwen 2.5 3B Q5 - Equilibrado' },
+  { model: 'hermes-q4', label: 'Hermes 8B Q4 - Inteligente' },
+  { model: 'auto', label: 'Automático' }
+],
+
+  desktop: [
+    { model: 'hermes-q4', label: 'Hermes Q4 - Rápido' },
+    { model: 'hermes-q5', label: 'Hermes Q5 - Equilibrado' },
+    { model: 'hermes-q6', label: 'Hermes Q6 - Inteligente' },
+    { model: 'auto', label: 'Automático' }
+  ]
+};
+
+let primaryModel = MODEL_PROFILES[HARDWARE_PROFILE][0].model;
+
 const collapsedProjects = new Set();
 let sidebarInitialized = false;
 let pendingAutoRename = null;
@@ -83,13 +104,14 @@ function showMenuView(viewName) {
 }
 
 function getLabel(model) {
+  const localModels = MODEL_PROFILES[HARDWARE_PROFILE] || [];
+  const localMatch = localModels.find(item => item.model === model);
+
+  if (localMatch) {
+    return localMatch.label;
+  }
+
   const labels = {
-    'hermes-q4': 'Hermes Q4',
-    'hermes-q5': 'Hermes Q5',
-    'hermes-q6': 'Hermes Q6',
-    'qwen_qwen3.5-0.8b': 'Qwen 0.8B',
-    'mistral-7b': 'Mistral 7B',
-    'auto': 'Automático',
     'gpt-4o-mini': 'GPT-4o-mini',
     'gpt-4.1-mini': 'GPT-4.1-mini',
     'gemini-2.5-flash': 'Gemini 2.5 Flash',
@@ -120,11 +142,13 @@ function updateMenuTriggerLabel() {
 }
 
 function refreshLocalActiveState() {
-  document.querySelectorAll('.local-model').forEach(btn => {
-    btn.classList.remove('active');
+  const buttons = menuViewLocal.querySelectorAll('.local-model');
 
+  buttons.forEach(btn => {
     if (btn.dataset.model === primaryModel) {
       btn.classList.add('active');
+    } else {
+      btn.classList.remove('active');
     }
   });
 }
@@ -171,14 +195,42 @@ document.querySelectorAll('[data-back]').forEach(btn => {
   });
 });
 
-document.querySelectorAll('.local-model').forEach(btn => {
-  btn.addEventListener('click', () => {
-    primaryModel = btn.dataset.model;
-    updateMenuTriggerLabel();
-    refreshLocalActiveState();
-    smartMenuPanel.classList.add('hidden');
+function renderLocalModels() {
+  menuViewLocal.innerHTML = '';
+
+  const backButton = document.createElement('button');
+  backButton.className = 'menu-back';
+  backButton.dataset.back = 'root';
+  backButton.textContent = '← volver';
+
+  backButton.addEventListener('click', () => {
+    showMenuView('root');
   });
-});
+
+  menuViewLocal.appendChild(backButton);
+
+  MODEL_PROFILES[HARDWARE_PROFILE].forEach(item => {
+    const btn = document.createElement('button');
+    btn.className = 'menu-item local-model';
+    btn.dataset.model = item.model;
+    btn.textContent = item.label;
+
+    btn.addEventListener('click', () => {
+      primaryModel = btn.dataset.model;
+      updateMenuTriggerLabel();
+      refreshLocalActiveState();
+      smartMenuPanel.classList.add('hidden');
+    });
+
+    menuViewLocal.appendChild(btn);
+  });
+}
+
+renderLocalModels();
+updateMenuTriggerLabel();
+showMenuView('root');
+refreshLocalActiveState();
+refreshServiceActiveState();
 
 document.querySelectorAll('.service-entry').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -342,12 +394,7 @@ function autoResizeUserInput() {
     userInput.scrollHeight > maxHeight ? 'auto' : 'hidden';
 }
 
-userInput.addEventListener('input', autoResizeUserInput);
-
-updateMenuTriggerLabel();
-showMenuView('root');
-refreshLocalActiveState();
-refreshServiceActiveState();
+userInput.addEventListener('input', autoResizeUserInput); 
 
 renderWelcomeScreen();
 

@@ -253,6 +253,7 @@ ${JSON.stringify(projectMemory, null, 2)}
 }
 
 async function sendToLocalAI(message, options = DEFAULT_MEMORY_OPTIONS) {
+  console.log('OPTIONS RECIBIDO:', options);
   memory.detectUserData(message, options);
   memory.addMessage('user', message, options);
   memory.addChatHistoryMessage('user', message, options);
@@ -330,16 +331,18 @@ async function sendToLocalAI(message, options = DEFAULT_MEMORY_OPTIONS) {
 
   console.log('HISTORIAL ENVIADO A LOCALAI:', messages);
 
+  console.log('MODELO USADO:', options);
+
   const response = await fetch('http://127.0.0.1:8080/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
-      model: 'hermes-q4',
+      model: options.primaryModel || 'hermes-q4',
       stream: false,
       temperature: 0,
-      max_tokens: 160,
+      max_tokens: 80,
       messages
     })
   });

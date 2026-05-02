@@ -5,7 +5,7 @@
 1. Usuario escribe mensaje.
 2. Frontend valida que no esté vacío.
 3. Si no hay chat activo, se crea uno en el contexto correcto.
-4. Frontend envía `POST /chat`.
+4. Frontend envía `POST /chat` incluyendo modelo seleccionado.
 5. Backend recibe mensaje y memoria activa.
 6. Backend envía contexto a LocalAI.
 7. LocalAI genera respuesta.

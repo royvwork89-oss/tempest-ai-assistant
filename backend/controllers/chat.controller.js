@@ -11,7 +11,7 @@ function buildMemoryOptions(req) {
 
 async function chat(req, res) {
   try {
-    const { message } = req.body;
+    const { message, config = {} } = req.body;
 
     if (!message || !message.trim()) {
       return res.status(400).json({
@@ -21,12 +21,17 @@ async function chat(req, res) {
     }
 
     const memoryOptions = buildMemoryOptions(req);
-    const reply = await sendToLocalAI(message, memoryOptions);
+
+    const reply = await sendToLocalAI(message, {
+      ...memoryOptions,
+      primaryModel: config.primaryModel || 'hermes-q4'
+    });
 
     return res.json({
       ok: true,
       reply
     });
+
   } catch (error) {
     console.error('Error en chat.controller:', error);
 

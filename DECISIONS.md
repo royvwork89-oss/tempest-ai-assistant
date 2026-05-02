@@ -229,3 +229,24 @@ Implementar transcripción con ffmpeg + LocalAI Whisper.
 - Añadir embeddings para búsqueda semántica.
 - Añadir renombrado automático de proyectos opcional.
 
+---
+
+## 🤖 Selección dinámica de modelos
+
+### Decisión
+
+Permitir cambiar el modelo de IA desde el frontend y enviarlo dinámicamente al backend.
+
+### Razón
+
+- aprovechar múltiples modelos locales
+- adaptar rendimiento según hardware (laptop vs desktop)
+- mejorar flexibilidad del sistema
+- preparar base para selección automática
+
+### Impacto
+
+- mayor control del usuario
+- integración directa con LocalAI
+- necesidad de validar modelos disponibles
+- base para futuras estrategias inteligentes de selección

@@ -791,3 +791,14 @@ body {
 .tool-menu-panel {
   z-index: 500;
 }
+
+.menu-item.local-model {
+  background: transparent;
+  border: 1px solid #444;
+}
+
+.menu-item.local-model.active {
+  background: #0f5132;
+  border-color: #198754;
+  color: #fff;
+}
