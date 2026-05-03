@@ -24,9 +24,9 @@ async function chat(req, res) {
 
     const reply = await sendToLocalAI(message, {
       ...memoryOptions,
-      primaryModel: config.primaryModel || 'hermes-q4'
+      primaryModel: config.primaryModel || 'hermes-q4',
+      hardwareProfile: config.hardwareProfile || 'laptop'
     });
-
     return res.json({
       ok: true,
       reply

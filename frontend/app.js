@@ -46,7 +46,7 @@ const confirmNewProjectBtn = document.getElementById('confirmNewProjectBtn');
 let pendingDelete = null;
 let pendingBulkDelete = null;
 
-
+//const HARDWARE_PROFILE = 'desktop';
 const HARDWARE_PROFILE = 'laptop';
 // laptop  = RTX 4050
 // desktop = RTX 4070
@@ -58,14 +58,15 @@ const MODEL_PROFILES = {
   laptop: [
     { model: 'qwen2.5-3b-q4', label: 'Qwen 2.5 3B Q4 - Rápido' },
     { model: 'qwen2.5-3b-q5', label: 'Qwen 2.5 3B Q5 - Equilibrado' },
-    { model: 'hermes-q4', label: 'Hermes 8B Q4 - Inteligente' },
+    { model: 'llama-3.2-3b-q4', label: 'LLaMA 3.2 3B Q4 - Inteligente' },
     { model: 'auto', label: 'Automático' }
   ],
 
   desktop: [
-    { model: 'hermes-q4', label: 'Hermes Q4 - Rápido' },
-    { model: 'hermes-q5', label: 'Hermes Q5 - Equilibrado' },
-    { model: 'hermes-q6', label: 'Hermes Q6 - Inteligente' },
+    { model: 'hermes-q4', label: 'Hermes 8B Q4 - Rápido' },
+    { model: 'hermes-q5', label: 'Hermes 8B Q5 - Equilibrado' },
+    { model: 'hermes-q6', label: 'Hermes 8B Q6 - Inteligente' },
+    { model: 'qwen2.5-3b-q5', label: 'Qwen 2.5 3B Q5 - Generador rápido' },
     { model: 'auto', label: 'Automático' }
   ]
 };
@@ -306,7 +307,7 @@ function selectAutomaticLocalModel(message) {
     text.includes('como');
 
   if (isComplex) {
-    return 'hermes-q4';
+    return 'llama-3.2-3b-q4';
   }
 
   if (isMedium) {
@@ -522,6 +523,7 @@ async function sendMessage() {
 
   const config = {
     primaryModel: selectedModel,
+    hardwareProfile: HARDWARE_PROFILE,
     assistants: getAssistants()
   };
 

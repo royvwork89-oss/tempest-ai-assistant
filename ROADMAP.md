@@ -2,7 +2,7 @@
 
 ## 🚧 Estado actual
 
-Versión actual: v0.3.4
+Versión actual: v0.3.5
 
 Sistema funcional con:
 
@@ -27,12 +27,13 @@ Sistema funcional con:
 - Mejora de limpieza de títulos generados por IA
 - Prevención básica de nombres duplicados en chats
 - Modo selección para eliminar múltiples chats independientes
-- Botones de acción por mensaje:
-  - copiar mensaje del usuario
-  - copiar respuesta completa de Tempest
-  - editar preparado para futuro
-  - compartir preparado para futuro
-  - intentar nuevamente preparado para futuro
+- Botones de acción por mensaje
+- 6 modelos configurados: 3 para laptop (RTX 4050) y 3 para desktop (RTX 4070)
+- Selección automática de modelo según tipo de consulta
+- Perfiles de tokens por modelo y perfil de hardware
+- Timeouts con AbortController en peticiones a LocalAI
+- YAMLs con templates correctos para todos los modelos
+- Docker-compose con soporte NVIDIA
 
 ---
 
@@ -51,7 +52,7 @@ Sistema funcional con:
 
 - [ ] Validar nombres para evitar caracteres inválidos
 - [ ] Evitar nombres duplicados de chats/proyectos
-- [ ] Mejorar renombrado automático de chats
+- [ ] Generar título de chat en background sin bloquear la conversación
 - [ ] Permitir renombrado automático opcional de proyectos
 - [ ] Añadir opción de cancelar creación de chat pendiente
 - [ ] Mejorar visual de proyecto activo/chat activo
@@ -72,6 +73,13 @@ Sistema funcional con:
 - [ ] Activar intentar nuevamente en respuestas de Tempest
 - [ ] Mejorar diseño visual de acciones por mensaje
 - [ ] Añadir soporte visual para archivos adjuntos
+
+### 🧱 Código
+
+- [ ] Separar archivos grandes en módulos más pequeños
+- [ ] Separar lógica de memoria controlada en su propio archivo
+- [ ] Separar lógica de tokens y perfiles de hardware en su propio archivo
+- [ ] Separar lógica de detección de respuestas incompletas en su propio archivo
 
 ---
 
@@ -100,17 +108,21 @@ Sistema funcional con:
 
 ## 🤖 Integración IA
 
-- [ ] Mejorar prompt del generador de títulos
-- [ ] Añadir selección automática de modelo
-- [ ] Añadir modo híbrido local + API externa
-- [ ] Añadir análisis de archivos
-- [ ] Añadir herramientas nuevas al menú +
 - [x] Implementar cambio real de modelo desde el menú de modelos
 - [x] Implementar selección automática de modelo según la consulta del usuario
-- [ ] Mejorar la lógica para que la IA separe correctamente múltiples bloques de código
+- [x] Mejorar la lógica para separación de múltiples archivos
+- [x] Implementar detección de respuestas incompletas
+- [x] Implementar regeneración de archivos cortados
+- [x] Implementar unión limpia de respuestas múltiples
+- [x] Configurar 6 modelos con YAMLs correctos (3 laptop + 3 desktop)
+- [x] Implementar perfiles de tokens por modelo y hardware
+- [x] Implementar timeouts con AbortController
 - [ ] Forzar formato de salida cuando la IA genere varios archivos de código
 - [ ] Mostrar en el chat cuándo inicia y cuándo termina una transcripción
 - [ ] Mover automáticamente al primer lugar el chat con la consulta más reciente
+- [ ] Validar número exacto de archivos generados
+- [ ] Reintento automático por archivos faltantes
+- [ ] Añadir modelos especializados opcionales (código, matemáticas)
 
 ---
 
@@ -138,4 +150,5 @@ Sistema funcional con:
 - [ ] Añadir app desktop con Electron
 - [ ] Añadir sincronización opcional
 - [ ] Añadir respaldo/exportación de memoria
-
+- [ ] Añadir soporte de visión con modelo multimodal
+- [ ] Añadir texto a voz con Piper

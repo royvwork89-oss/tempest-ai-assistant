@@ -244,6 +244,31 @@ ESTILO:
 - Puedes recomendar 2 o 3 ejemplos.
 - Máximo 4 párrafos cortos.
 
+REGLAS DE CÓDIGO (MUY IMPORTANTE):
+
+- Si el usuario pide código, SIEMPRE responde con bloques separados.
+- Cada archivo debe ir en su propio bloque.
+- Escribe siempre: Archivo: nombre-del-archivo.ext antes de cada uno.
+- Nunca mezcles archivos.
+- Nunca cortes código.
+- Entrega TODOS los archivos solicitados.
+
+PRIORIDAD:
+
+Si el usuario pide varios archivos:
+- entrega TODOS aunque sean simples
+- NO te detengas después del primero
+- es mejor entregar archivos básicos completos que uno solo perfecto
+
+ACLARACIÓN CRÍTICA:
+- Cuando el usuario pide archivos (HTML, CSS, JS, Node, etc),
+  NO estás creando archivos reales en su sistema.
+- SOLO estás mostrando ejemplos de código.
+- SIEMPRE puedes generar código sin pedir más información.
+- NO digas que no puedes generar archivos.
+- NO pidas contexto adicional para ejemplos básicos.
+- Asume que el usuario quiere un ejemplo funcional simple
+
 PROFILE DEL USUARIO, SOLO PARA CONSULTAS EXPLÍCITAS DE MEMORIA:
 ${JSON.stringify(profile, null, 2)}
 
@@ -251,6 +276,103 @@ MEMORIA DEL PROYECTO, SOLO SI EL USUARIO PREGUNTA POR TEMPEST:
 ${JSON.stringify(projectMemory, null, 2)}
 `;
 }
+
+function countCodeFences(text) {
+  return (String(text || '').match(/```/g) || []).length;
+}
+
+function findLastFileHeadingBefore(text, index) {
+  const lines = String(text || '').split('\n');
+  let position = 0;
+  let lastHeadingPosition = -1;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+
+    const isFileHeading =
+      trimmed.toLowerCase().startsWith('archivo:') ||
+      /^\d+\.\s+.+/.test(trimmed);
+
+    if (isFileHeading && position <= index) {
+      lastHeadingPosition = position;
+    }
+
+    position += line.length + 1;
+  }
+
+  return lastHeadingPosition >= 0 ? lastHeadingPosition : index;
+}
+
+function removeIncompleteFileBlock(text) {
+  const value = String(text || '');
+  const fenceCount = countCodeFences(value);
+
+  if (fenceCount % 2 === 0) {
+    return value.trim();
+  }
+
+  const lastFenceIndex = value.lastIndexOf('```');
+  const cutIndex = findLastFileHeadingBefore(value, lastFenceIndex);
+
+  return value.slice(0, cutIndex).trim();
+}
+
+const HARDWARE_TOKEN_PROFILES = {
+  laptop: {
+    default:             { normal: 500, code: 900,  continue: 900  },
+    'qwen2.5-3b-q4':    { normal: 500, code: 900,  continue: 900  },
+    'qwen2.5-3b-q5':    { normal: 600, code: 1000, continue: 1000 },
+    'llama-3.2-3b-q4':  { normal: 600, code: 1000, continue: 1000 }
+  },
+  desktop: {
+    default:             { normal: 1000, code: 1800, continue: 1800 },
+    'hermes-q4':         { normal: 1000, code: 1700, continue: 1700 },
+    'hermes-q5':         { normal: 1200, code: 1900, continue: 1900 },
+    'hermes-q6':         { normal: 1400, code: 2200, continue: 2200 }
+  }
+};
+
+function isCodeRequest(message) {
+  return /archivo|archivos|genera|crea|código|codigo|función|funcion|proyecto|html|css|javascript|js|node|express|backend|frontend/i
+    .test(String(message || ''));
+}
+
+function getMaxTokens(model, message, mode = 'normal', hardwareProfile = 'laptop') {
+  const selectedHardware = HARDWARE_TOKEN_PROFILES[hardwareProfile]
+    ? hardwareProfile
+    : 'laptop';
+
+  const selectedModel = model || 'hermes-q4';
+  const hardwareConfig = HARDWARE_TOKEN_PROFILES[selectedHardware];
+  const modelConfig = hardwareConfig[selectedModel] || hardwareConfig.default;
+
+  if (mode === 'continue') return modelConfig.continue;
+  if (isCodeRequest(message)) return modelConfig.code;
+
+  return modelConfig.normal;
+}
+
+function looksLikeCutReply(text) {
+  const value = String(text || '').trim();
+
+  if (value.length < 300) {
+    return false;
+  }
+
+  const hasOpenCodeBlock = countCodeFences(value) % 2 !== 0;
+
+  const endsLikeBrokenCode =
+    /=\s*$/.test(value) ||
+    /\{\s*$/.test(value) ||
+    /\(\s*$/.test(value) ||
+    /,\s*$/.test(value) ||
+    /const\s+\w+\s*=\s*$/.test(value) ||
+    /let\s+\w+\s*=\s*$/.test(value);
+
+  return hasOpenCodeBlock || endsLikeBrokenCode;
+}
+
+
 
 async function sendToLocalAI(message, options = DEFAULT_MEMORY_OPTIONS) {
   console.log('OPTIONS RECIBIDO:', options);
@@ -289,33 +411,35 @@ async function sendToLocalAI(message, options = DEFAULT_MEMORY_OPTIONS) {
   }
 
 
-  const history = memory.getHistory(options).filter(msg => {
-    const text = msg.content.toLowerCase();
+  const history = memory.getHistory(options)
+    .slice(-4)
+    .filter(msg => {
+      const text = msg.content.toLowerCase();
 
-    if (
-      msg.role === 'user' &&
-      (
-        text.includes('me gusta') ||
-        text.includes('quiero') ||
-        text.includes('estoy trabajando')
-      )
-    ) {
-      return false;
-    }
+      if (
+        msg.role === 'user' &&
+        (
+          text.includes('me gusta') ||
+          text.includes('quiero') ||
+          text.includes('estoy trabajando')
+        )
+      ) {
+        return false;
+      }
 
-    if (
-      msg.role === 'assistant' &&
-      (
-        text.includes('no tengo memoria') ||
-        text.includes('basado en lo que') ||
-        text.trim() === ''
-      )
-    ) {
-      return false;
-    }
+      if (
+        msg.role === 'assistant' &&
+        (
+          text.includes('no tengo memoria') ||
+          text.includes('basado en lo que') ||
+          text.trim() === ''
+        )
+      ) {
+        return false;
+      }
 
-    return true;
-  });
+      return true;
+    });
 
   const messages = [
     {
@@ -333,8 +457,12 @@ async function sendToLocalAI(message, options = DEFAULT_MEMORY_OPTIONS) {
 
   console.log('MODELO USADO:', options);
 
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 120000);
+
   const response = await fetch('http://127.0.0.1:8080/v1/chat/completions', {
     method: 'POST',
+    signal: controller.signal,
     headers: {
       'Content-Type': 'application/json'
     },
@@ -342,33 +470,94 @@ async function sendToLocalAI(message, options = DEFAULT_MEMORY_OPTIONS) {
       model: options.primaryModel || 'hermes-q4',
       stream: false,
       temperature: 0,
-      max_tokens: 80,
+      max_tokens: getMaxTokens(
+        options.primaryModel,
+        message,
+        'normal',
+        options.hardwareProfile || 'laptop'
+      ),
       messages
     })
   });
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Error LocalAI: ${errorText}`);
+if (!response.ok) {
+  const errorText = await response.text();
+  throw new Error(`Error LocalAI: ${errorText}`);
+}
+
+const data = await response.json();
+console.log('RESPUESTA LOCALAI:', data);
+clearTimeout(timeoutId);
+
+let reply =
+  data?.choices?.[0]?.message?.content ||
+  data?.choices?.[0]?.text ||
+  'Sin respuesta';
+
+reply = cleanReply(reply);
+
+const isCut = looksLikeCutReply(reply);
+
+if (isCut) {
+  console.log('⚠️ Respuesta incompleta, regenerando archivo cortado...');
+
+  const safeReply = removeIncompleteFileBlock(reply);
+
+const continueController = new AbortController();
+  const continueTimeoutId = setTimeout(() => continueController.abort(), 120000);
+
+  const continueResponse = await fetch('http://127.0.0.1:8080/v1/chat/completions', {
+    method: 'POST',
+    signal: continueController.signal,
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      model: options.primaryModel || 'hermes-q4',
+      stream: false,
+      temperature: 0,
+      max_tokens: getMaxTokens(
+        options.primaryModel,
+        message,
+        'continue',
+        options.hardwareProfile || 'laptop'
+      ),
+      messages: [
+        ...messages,
+        {
+          role: 'assistant',
+          content: reply
+        },
+        {
+          role: 'user',
+          content: 'Tu respuesta anterior quedó cortada. NO repitas los archivos completos que ya entregaste. Regenera COMPLETO el archivo que quedó incompleto y después continúa con los archivos faltantes. Usa bloques separados.'
+        }
+      ]
+    })
+  });
+  clearTimeout(continueTimeoutId);
+
+  if (continueResponse.ok) {
+    const continueData = await continueResponse.json();
+
+    let extra =
+      continueData?.choices?.[0]?.message?.content ||
+      continueData?.choices?.[0]?.text ||
+      '';
+
+    extra = cleanReply(extra);
+
+    reply = [safeReply, extra].filter(Boolean).join('\n\n').trim();
   }
+}
 
-  const data = await response.json();
-  console.log('RESPUESTA LOCALAI:', data);
+if (!reply) {
+  reply = 'No pude generar una respuesta válida.';
+}
 
-  let reply =
-    data?.choices?.[0]?.message?.content ||
-    data?.choices?.[0]?.text ||
-    'Sin respuesta';
+memory.addChatHistoryMessage('assistant', reply, options);
 
-  reply = cleanReply(reply);
-
-  if (!reply) {
-    reply = 'No pude generar una respuesta válida.';
-  }
-
-  memory.addChatHistoryMessage('assistant', reply, options);
-
-  return reply;
+return reply;
 }
 
 function cleanGeneratedTitle(rawTitle, sourceText = '') {
@@ -430,7 +619,7 @@ function cleanGeneratedTitle(rawTitle, sourceText = '') {
   return title.charAt(0).toUpperCase() + title.slice(1);
 }
 
-async function generateTitleFromText(text, type = 'chat') {
+async function generateTitleFromText(text, type = 'chat', model = 'hermes-q4') {
   const normalizedText = String(text || '').trim();
 
   const prompt = `
@@ -461,7 +650,7 @@ Título:
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'hermes-q4',
+        model: model,
         stream: false,
         temperature: 0,
         max_tokens: 20,
@@ -496,8 +685,8 @@ Título:
   }
 }
 
-module.exports = 
-{ 
+module.exports =
+{
   sendToLocalAI,
-  generateTitleFromText 
+  generateTitleFromText
 };

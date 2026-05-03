@@ -18,9 +18,22 @@ Tempest es un asistente local de IA construido con Node.js, Express, LocalAI y f
 
 - Selector dinámico de modelos desde el frontend.
 - Soporte para múltiples perfiles de hardware (laptop / desktop).
+- 3 modelos por perfil de hardware: rápido, equilibrado, inteligente.
+- Modo automático que elige el modelo según el tipo de consulta.
 - Integración con LocalAI mediante nombres reales de modelo.
 - Cambio de modelo en tiempo real por chat.
-- Preparado para selección automática de modelo.
+
+### 🖥️ Perfiles de hardware
+
+**Laptop (RTX 4050):**
+- Rápido: `qwen2.5-3b-q4`
+- Equilibrado: `qwen2.5-3b-q5`
+- Inteligente: `llama-3.2-3b-q4`
+
+**Desktop (RTX 4070):**
+- Rápido: `hermes-q4`
+- Equilibrado: `hermes-q5`
+- Inteligente: `hermes-q6`
 
 ### 🧠 Sistema de memoria
 
@@ -69,6 +82,34 @@ Cada proyecto funciona como un espacio de trabajo con sus propios chats.
   - PDF
   - DOCX
 
+### 🤖 Control avanzado de respuestas IA
+
+- Detección automática de respuestas incompletas.
+- Regeneración inteligente de archivos cortados.
+- Unión limpia de múltiples respuestas.
+- Prevención de duplicados en bloques de código.
+- Soporte para generación de múltiples archivos en una sola petición.
+
+### ⚙️ Selección automática de modelo
+
+- Elección dinámica del modelo según el tipo de consulta.
+- Consultas complejas (código, arquitectura, explicaciones) → modelo inteligente.
+- Consultas medias (ejemplos, comparaciones) → modelo equilibrado.
+- Consultas simples (conversación, preguntas cortas) → modelo rápido.
+
+### 🔥 Gestión dinámica de tokens
+
+- Ajuste automático de `max_tokens` según el tipo de solicitud y hardware.
+- Más tokens para generación de código.
+- Menos tokens para conversación normal.
+- Perfiles separados por modelo y perfil de hardware.
+
+### ⏱️ Control de timeouts
+
+- Timeout de 120 segundos por petición a LocalAI.
+- AbortController para cancelar peticiones colgadas.
+- Timeout independiente para petición de continuación de respuesta.
+
 ---
 
 ## 🏗️ Arquitectura
@@ -111,6 +152,17 @@ frontend/
 ├── chatState.js
 ├── ui.js
 └── styles.css
+
+models-localai/
+├── hermes-q4.yaml
+├── hermes-q5.yaml
+├── hermes-q6.yaml
+├── llama-3.2-3b-q4.yaml
+├── qwen2.5-3b-q4.yaml
+└── qwen2.5-3b-q5.yaml
+
+docker/
+└── docker-compose.yml
 ```
 
 ---
@@ -146,6 +198,7 @@ POST /transcribe
 - PDFKit
 - docx
 - HTML/CSS
+- Docker
 
 ---
 
@@ -160,7 +213,12 @@ npm install
 
 ### 2. Ejecutar LocalAI
 
-LocalAI debe estar disponible en:
+```bash
+cd docker
+docker compose up -d
+```
+
+LocalAI queda disponible en:
 
 ```text
 http://localhost:8080
@@ -169,6 +227,7 @@ http://localhost:8080
 ### 3. Ejecutar backend
 
 ```bash
+cd backend
 node server.js
 ```
 
@@ -178,21 +237,30 @@ node server.js
 http://localhost:3005
 ```
 
+### 5. Cambiar perfil de hardware
+
+En `frontend/app.js` línea 50:
+
+```js
+const HARDWARE_PROFILE = 'laptop'; // o 'desktop'
+```
+
 ---
 
 ## ⚠️ Requisitos
 
 - Node.js
 - ffmpeg instalado y en PATH
-- Docker/LocalAI funcionando
-- Modelo de chat configurado
-- Modelo Whisper configurado para transcripción
+- Docker con soporte NVIDIA (runtime: nvidia)
+- Drivers NVIDIA actualizados
+- Modelos GGUF descargados en `models-localai/`
+- YAMLs de configuración por modelo en `models-localai/`
 
 ---
 
 ## 🧠 Estado del proyecto
 
-Versión actual: **v0.3.4**
+Versión actual: **v0.3.5**
 
 Tempest ya cuenta con:
 
@@ -209,20 +277,21 @@ Tempest ya cuenta con:
 - textarea autoexpandible con límite de altura
 - estructura visual preparada para adjuntar archivos/imágenes en el futuro
 - modo selección para eliminar múltiples chats independientes
-- botones de acción por mensaje:
-  - copiar consulta
-  - copiar respuesta completa
-  - editar preparado para futuro
-  - compartir preparado para futuro
-  - intentar nuevamente preparado para futuro
+- botones de acción por mensaje
+- 6 modelos configurados (3 laptop + 3 desktop)
+- selección automática de modelo según tipo de consulta
+- perfiles de tokens por modelo y hardware
+- timeouts con AbortController para peticiones a LocalAI
+- YAMLs con templates correctos para todos los modelos
+- docker-compose con soporte NVIDIA
 
 ---
 
 ## 🔮 Próximos pasos
 
-- Seguir refinando nombres generados por IA.
+- Generar título de chat en background sin bloquear la conversación.
+- Separar archivos grandes en módulos más pequeños.
 - Implementar subida y vista previa de archivos/imágenes.
-- Mejorar formato obligatorio de respuestas con código.
 - Añadir resaltado de sintaxis para bloques de código.
 - Añadir validación avanzada de nombres.
 - Añadir resumen automático por chat/proyecto.
@@ -230,11 +299,6 @@ Tempest ya cuenta con:
 - Migrar persistencia a base de datos.
 - Añadir login real.
 - Convertir en app desktop con Electron.
-- Implementar cambio real de modelo desde el menú.
-- Implementar selección automática de modelo según la consulta.
-- Mejorar la separación de múltiples bloques de código generados por IA.
-- Mostrar estados visibles de inicio y fin de transcripción en el chat.
-- Ordenar visualmente los chats por actividad reciente.
 
 ---
 
@@ -249,4 +313,3 @@ Backend Developer enfocado en Node.js, IA local, automatización y sistemas conv
 ## ⭐ Nota
 
 Este proyecto forma parte de mi portafolio como desarrollador backend y demuestra integración de IA local, arquitectura modular, memoria persistente y organización multi-contexto.
-

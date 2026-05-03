@@ -8,7 +8,7 @@ Tempest es un asistente local de IA con arquitectura cliente-servidor, frontend 
 Usuario → Frontend → Backend → Memoria/Servicios → LocalAI → Backend → Frontend
 ```
 
-El sistema ya no funciona como un chat único. Ahora maneja conversaciones organizadas por usuario, proyectos y chats independientes.
+El sistema maneja conversaciones organizadas por usuario, proyectos y chats independientes, con selección dinámica de modelos según el hardware disponible y el tipo de consulta.
 
 ---
 
@@ -27,6 +27,8 @@ El sistema ya no funciona como un chat único. Ahora maneja conversaciones organ
 - Botones de copiar para consultas y respuestas.
 - Modo selección para eliminación múltiple de chats independientes.
 - Input multilínea autoexpandible preparado para adjuntos.
+- Selección automática de modelo según tipo de consulta.
+- Perfiles de hardware configurables (laptop / desktop).
 
 ### Backend
 
@@ -36,12 +38,60 @@ El sistema ya no funciona como un chat único. Ahora maneja conversaciones organ
 - Persistencia por archivos JSON.
 - Endpoints para crear, listar, renombrar y eliminar chats/proyectos.
 - Endpoint para generación automática de títulos.
+- Timeouts con AbortController para peticiones a LocalAI.
+- Perfiles de tokens por modelo y hardware.
 
 ### Motor IA
 
 - LocalAI ejecutando modelos GGUF para chat.
 - Modelo Whisper vía LocalAI para transcripción de audio.
 - Generación auxiliar de títulos cortos para chats.
+- 6 modelos configurados con YAMLs y templates correctos.
+
+### Docker
+
+- LocalAI en contenedor Docker con soporte NVIDIA.
+- Volumen montado desde `models-localai/` hacia `/models` en el contenedor.
+- Variables de entorno para habilitar GPU.
+
+---
+
+## 🖥️ Perfiles de hardware y modelos
+
+```text
+Laptop (RTX 4050)
+├── Rápido:      qwen2.5-3b-q4
+├── Equilibrado: qwen2.5-3b-q5
+└── Inteligente: llama-3.2-3b-q4
+
+Desktop (RTX 4070)
+├── Rápido:      hermes-q4
+├── Equilibrado: hermes-q5
+└── Inteligente: hermes-q6
+```
+
+Para cambiar de perfil, editar en `frontend/app.js`:
+
+```js
+const HARDWARE_PROFILE = 'laptop'; // o 'desktop'
+```
+
+---
+
+## 🤖 Selección automática de modelo
+
+El modo automático en el frontend analiza el mensaje del usuario y elige el modelo más adecuado:
+
+```text
+Mensaje complejo (código, arquitectura, explicación detallada)
+→ modelo inteligente
+
+Mensaje medio (ejemplos, comparaciones, cómo hacer algo)
+→ modelo equilibrado
+
+Mensaje simple (conversación, preguntas cortas)
+→ modelo rápido
+```
 
 ---
 
@@ -116,7 +166,17 @@ Tempest/
 │   ├── ui.js
 │   └── styles.css
 │
+├── models-localai/
+│   ├── hermes-q4.yaml
+│   ├── hermes-q5.yaml
+│   ├── hermes-q6.yaml
+│   ├── llama-3.2-3b-q4.yaml
+│   ├── qwen2.5-3b-q4.yaml
+│   ├── qwen2.5-3b-q5.yaml
+│   └── [archivos .gguf]
+│
 └── docker/
+    └── docker-compose.yml
 ```
 
 ---
@@ -126,6 +186,8 @@ Tempest/
 ```text
 frontend/app.js
 ↓
+Selección de modelo (manual o automático)
+↓
 api.js → POST /chat
 ↓
 routes/chat.routes.js
@@ -133,10 +195,13 @@ routes/chat.routes.js
 controllers/chat.controller.js
 ↓
 services/localai.service.js
+  ↓ Respuestas rápidas sin IA (hora, saludo, memoria controlada)
+  ↓ Construcción de historial y system prompt
+  ↓ Fetch a LocalAI con AbortController (timeout 120s)
+  ↓ Detección de respuesta incompleta
+  ↓ Regeneración si es necesario
 ↓
 services/memory.service.js
-↓
-LocalAI
 ↓
 Respuesta guardada en memoria
 ↓
@@ -146,8 +211,6 @@ Frontend renderiza mensaje
 ---
 
 ## 🧭 Sidebar y organización visual
-
-La UI permite trabajar con:
 
 ```text
 + Nuevo Chat
@@ -160,49 +223,6 @@ chat independiente
    + Nuevo chat
    chat del proyecto
 ```
-
-### Comportamiento
-
-- Los proyectos inician colapsados al refrescar.
-- Al expandir un proyecto se muestran sus chats.
-- Al seleccionar un chat se marca visualmente como activo.
-- Si el proyecto está colapsado, se marca el proyecto activo.
-- Cada chat/proyecto tiene menú de tres puntos:
-  - Renombrar
-  - Eliminar
-
----
-
-## 🧠 Creación inteligente de chats
-
-### Nuevo chat sin proyecto
-
-1. Usuario presiona `+ Nuevo Chat`.
-2. Se muestra pantalla inicial: “¿En qué puedo ayudarte?”
-3. No se crea archivo todavía.
-4. Al enviar el primer mensaje:
-   - se crea chat en `general`
-   - se envía el mensaje a la IA
-   - la IA genera un título corto
-   - el chat se renombra automáticamente
-
-### Nuevo chat dentro de proyecto
-
-1. Usuario expande un proyecto.
-2. Presiona `+ Nuevo chat`.
-3. Se muestra pantalla inicial.
-4. Al enviar el primer mensaje:
-   - se crea chat dentro del proyecto
-   - la IA genera un nombre basado en la consulta
-   - el chat se renombra automáticamente
-
-### Nuevo proyecto
-
-1. Usuario presiona `+ Nuevo Proyecto`.
-2. Se abre modal para escribir el nombre del proyecto.
-3. Al aceptar, se crea el proyecto.
-4. Se muestra pantalla inicial.
-5. El primer mensaje crea y renombra el primer chat dentro de ese proyecto.
 
 ---
 
@@ -241,11 +261,8 @@ POST /transcribe
 - Carga de audio desde frontend.
 - División del audio en fragmentos con ffmpeg.
 - Transcripción con Whisper vía LocalAI.
-- Generación de archivos:
-  - TXT
-  - PDF
-  - DOCX
-- Limpieza automática esperada de archivos temporales.
+- Generación de archivos TXT, PDF y DOCX.
+- Limpieza automática de archivos temporales.
 
 ---
 
@@ -257,4 +274,8 @@ POST /transcribe
 - Persistencia simple y depurable.
 - Preparado para migrar a base de datos.
 - Preparado para sistema multiusuario real.
-
+- Orquestación de comportamiento de IA en backend.
+- Corrección automática de fallos del modelo.
+- Sistema de recuperación de respuestas incompletas.
+- Separación entre generación y validación de contenido IA.
+- Perfiles de hardware para adaptar el sistema a diferentes equipos.

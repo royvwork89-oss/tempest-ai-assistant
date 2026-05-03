@@ -10,5 +10,13 @@ services:
       - MODELS_PATH=/models
       - DEBUG=true
       - NVIDIA_DISABLE_REQUIRE=1
-    runtime: nvidia
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
     restart: unless-stopped
