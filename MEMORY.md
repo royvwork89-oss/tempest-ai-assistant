@@ -195,3 +195,33 @@ Flujo:
 - Se debe evitar sobrescribir chats/proyectos con nombres repetidos.
 - Se puede añadir resumen automático por chat y por proyecto.
 
+---
+
+## 🏷️ Renombrado automático en herramientas
+
+Tempest también puede renombrar chats creados desde herramientas.
+
+### Transcripción
+
+Cuando el usuario inicia una transcripción en un chat nuevo:
+
+1. Se crea el chat temporal.
+2. Se procesa el audio.
+3. Se genera el documento.
+4. Se construye un prompt de título con:
+   - nombre del archivo
+   - formato
+   - modo de transcripción
+5. Se llama a `/title/generate`.
+6. El chat se renombra automáticamente.
+
+Prompt interno usado para título:
+
+```text
+Transcripción de audio
+Archivo: audio.m4a
+Formato: PDF
+Modo: Texto corrido
+```
+
+Esto evita que las transcripciones queden como `chat-123` o `Nueva conversación`.

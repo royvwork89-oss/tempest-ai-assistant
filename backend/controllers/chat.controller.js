@@ -9,27 +9,54 @@ function buildMemoryOptions(req) {
   };
 }
 
+const { buildAttachmentContext } = require('../services/attachment.service');
+
 async function chat(req, res) {
   try {
-    const { message, config = {} } = req.body;
+    const rawMessage = req.body?.message || '';
+    const files = req.files || [];
 
-    if (!message || !message.trim()) {
+    if ((!rawMessage || !rawMessage.trim()) && files.length === 0) {
       return res.status(400).json({
         ok: false,
         error: 'El mensaje está vacío'
       });
     }
 
+    let config = req.body?.config || {};
+
+    if (typeof config === 'string') {
+      try {
+        config = JSON.parse(config);
+      } catch {
+        config = {};
+      }
+    }
+
+    const message = rawMessage.trim() || 'Analiza los archivos adjuntos.';
+    const attachmentContext = buildAttachmentContext(files);
+
+    const finalMessage = attachmentContext
+      ? `${message}\n\n${attachmentContext}`
+      : message;
+
     const memoryOptions = buildMemoryOptions(req);
 
-    const reply = await sendToLocalAI(message, {
+    const reply = await sendToLocalAI(finalMessage, {
       ...memoryOptions,
       primaryModel: config.primaryModel || 'hermes-q4',
       hardwareProfile: config.hardwareProfile || 'laptop'
     });
+
     return res.json({
       ok: true,
-      reply
+      reply,
+      attachments: files.map(file => ({
+        originalName: file.originalname,
+        filename: file.filename,
+        size: file.size,
+        mimetype: file.mimetype
+      }))
     });
 
   } catch (error) {

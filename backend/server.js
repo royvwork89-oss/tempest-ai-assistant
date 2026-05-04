@@ -4,6 +4,7 @@ const path = require('path');
 
 const chatRoutes = require('./routes/chat.routes');
 const transcriptionRoutes = require('./routes/transcription.routes');
+const documentRoutes = require('./routes/document.routes');
 
 const app = express();
 const PORT = 3005;
@@ -24,6 +25,7 @@ app.get('/', (req, res) => {
 // Rutas del backend
 app.use('/', chatRoutes);
 app.use('/', transcriptionRoutes);
+app.use('/', documentRoutes);
 
 app.listen(PORT, () => {
   console.log(`Tempest activo en http://localhost:${PORT}`);

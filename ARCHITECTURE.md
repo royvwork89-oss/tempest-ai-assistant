@@ -17,25 +17,54 @@ El sistema maneja conversaciones organizadas por usuario, proyectos y chats inde
 ### Frontend
 
 - Interfaz de chat tipo ChatGPT.
-- Sidebar con chats independientes y proyectos — `modules/sidebar.js`
-- Menú de modelos locales y servicios externos — `modules/models.js`
-- Menú de herramientas con transcripción de audio.
-- Modales para transcripción, eliminación y creación de proyectos.
+- Sidebar con chats independientes y proyectos — `modules/sidebar.js`.
+- Menú de modelos locales y servicios externos — `modules/models.js`.
+- Menú de herramientas con:
+  - transcripción de audio
+  - adjuntar archivos
+  - opciones futuras para imagen/video
+- Modal de transcripción con:
+  - selector de audio
+  - modo texto corrido / timestamps
+  - formato TXT/PDF/DOCX
+- Preview de archivos adjuntos.
+- Drag & drop sobre chat/input.
+- Tarjeta visual de documento generado.
+- Botones:
+  - Ver documento
+  - Descargar
 - Estado activo del chat mediante `chatState.js`.
-- Comunicación HTTP con el backend mediante `api.js`.
-- Renderizado de respuestas con acciones por mensaje — `ui.js`
+- Comunicación HTTP con backend mediante `api.js`.
+- Renderizado de respuestas con acciones por mensaje — `ui.js`.
+- Renombrado automático de chats al iniciar conversaciones normales.
+- Renombrado automático de chats al terminar una transcripción.
 - Selección automática de modelo según tipo de consulta.
-- Perfiles de hardware configurables (laptop / desktop).
+- Perfiles de hardware configurables: laptop / desktop.
 
 ### Backend
 
 - API REST con Express.
-- Controladores para chat y transcripción.
-- Servicios separados para LocalAI, memoria y transcripción.
+- Controladores para:
+  - chat
+  - transcripción
+  - generación de documentos
+- Servicios separados para:
+  - LocalAI
+  - memoria
+  - transcripción
+  - adjuntos
+  - documentos
 - Módulos internos de LocalAI en `services/localai/`.
 - Persistencia por archivos JSON.
-- Endpoints para crear, listar, renombrar y eliminar chats/proyectos.
+- Endpoints para crear/listar/renombrar/eliminar chats y proyectos.
 - Endpoint para generación automática de títulos.
+- Endpoint para adjuntar archivos al chat.
+- Endpoint para generar documentos.
+- Endpoint para transcribir audio.
+- Limpieza automática de temporales:
+  - audio original
+  - chunks
+  - documentos viejos
 - Timeouts con AbortController para peticiones a LocalAI.
 - Perfiles de tokens por modelo y hardware.
 
@@ -116,6 +145,7 @@ Tempest/
 │   │   └── systemPrompt.js
 │   ├── controllers/
 │   │   ├── chat.controller.js
+│   │   ├── document.controller.js
 │   │   └── transcription.controller.js
 │   ├── data/
 │   │   └── users/
@@ -129,19 +159,24 @@ Tempest/
 │   │                   ├── projectMemory.json
 │   │                   └── chats/
 │   ├── outputs/
+│   │   ├── documents/
 │   │   └── transcriptions/
 │   ├── routes/
 │   │   ├── chat.routes.js
+│   │   ├── document.routes.js
 │   │   └── transcription.routes.js
 │   ├── services/
 │   │   ├── localai/
 │   │   │   ├── memory.answers.js
 │   │   │   ├── response.validator.js
 │   │   │   └── token.profiles.js
+│   │   ├── attachment.service.js
+│   │   ├── document.service.js
 │   │   ├── localai.service.js
 │   │   ├── memory.service.js
 │   │   └── transcription.service.js
 │   ├── uploads/
+│   │   ├── attachments/
 │   │   ├── audio/
 │   │   └── chunks/
 │   ├── utils/
@@ -150,6 +185,7 @@ Tempest/
 │
 ├── frontend/
 │   ├── modules/
+│   │   ├── attachments.js
 │   │   ├── models.js
 │   │   └── sidebar.js
 │   ├── index.html
@@ -240,3 +276,105 @@ POST /transcribe
 - Orquestación de comportamiento de IA en backend.
 - Corrección automática de fallos del modelo.
 - Perfiles de hardware para adaptar el sistema a diferentes equipos.
+
+## 📎 Sistema de adjuntos
+
+Tempest permite adjuntar archivos al chat y usarlos como contexto para LocalAI.
+
+Flujo:
+
+```text
+Usuario adjunta archivo
+↓
+frontend/modules/attachments.js guarda la selección
+↓
+api.js envía FormData
+↓
+chat.routes.js recibe archivos con multer
+↓
+attachment.service.js lee contenido compatible
+↓
+chat.controller.js agrega contexto al mensaje
+↓
+LocalAI responde usando el contenido adjunto
+```
+
+Formatos procesados como texto:
+
+```text
+.txt
+.md
+.json
+.js
+.css
+.html
+.py
+.ts
+```
+
+---
+
+## 📄 Sistema de documentos
+
+Tempest puede crear documentos descargables desde instrucciones del usuario.
+
+Flujo:
+
+```text
+Usuario pide documento
+↓
+Frontend detecta formato solicitado
+↓
+POST /document/generate
+↓
+Backend genera contenido con LocalAI
+↓
+document.service.js crea TXT/PDF/DOCX
+↓
+Frontend muestra tarjeta descargable
+```
+
+Formatos:
+
+```text
+txt
+pdf
+docx
+```
+
+El modelo usado para documentos es el modelo seleccionado en la interfaz. Si el frontend no manda modelo, se usa fallback por perfil de hardware:
+
+```text
+desktop → hermes-q5
+laptop  → qwen2.5-3b-q4
+```
+
+---
+
+## 🎙️ Sistema de transcripción
+
+La transcripción usa Whisper vía LocalAI, no el modelo seleccionado de chat.
+
+Flujo:
+
+```text
+Usuario selecciona audio
+↓
+Usuario elige modo y formato
+↓
+POST /transcribe
+↓
+Backend guarda audio temporal
+↓
+ffmpeg divide en chunks
+↓
+Whisper transcribe chunks
+↓
+Backend une texto
+↓
+Backend genera TXT/PDF/DOCX
+↓
+Backend limpia temporales
+↓
+Frontend muestra tarjeta descargable
+```

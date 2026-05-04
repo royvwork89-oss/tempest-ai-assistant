@@ -200,3 +200,76 @@ function renderCodeBlock(code, language) {
 
   return wrapper;
 }
+
+export function addDocumentCard(chatBox, documentData) {
+  const row = document.createElement('div');
+  row.className = 'message-row bot';
+
+  const bubble = document.createElement('div');
+  bubble.className = 'message bot';
+
+  const label = document.createElement('div');
+  label.className = 'message-label';
+  label.textContent = 'Tempest';
+
+  const card = document.createElement('div');
+  card.className = 'document-card';
+
+  const title = document.createElement('h3');
+  title.textContent = '📄 Documento generado';
+
+  const info = document.createElement('p');
+  info.textContent = `${documentData.title || 'Documento'} · ${String(documentData.format || '').toUpperCase()}`;
+
+  const preview = document.createElement('div');
+  preview.className = 'document-preview';
+
+  const previewText = String(documentData.previewText || '').trim();
+
+  preview.textContent = previewText.length > 700
+    ? previewText.slice(0, 700) + '...'
+    : previewText;
+
+  const actions = document.createElement('div');
+  actions.className = 'document-actions';
+
+  const viewBtn = document.createElement('a');
+  viewBtn.textContent = 'Ver documento';
+  viewBtn.className = 'document-btn';
+  viewBtn.href = documentData.fileUrl;
+  viewBtn.target = '_blank';
+  viewBtn.rel = 'noopener noreferrer';
+
+const downloadBtn = document.createElement('a');
+downloadBtn.textContent = 'Descargar';
+downloadBtn.className = 'document-btn primary';
+downloadBtn.href = documentData.downloadUrl || documentData.fileUrl;
+downloadBtn.target = '_blank';
+downloadBtn.rel = 'noopener noreferrer';
+
+if (documentData.filename) {
+  downloadBtn.setAttribute('download', documentData.filename);
+}
+
+  actions.appendChild(viewBtn);
+  actions.appendChild(downloadBtn);
+
+  card.appendChild(title);
+  card.appendChild(info);
+
+  if (previewText) {
+    card.appendChild(preview);
+  }
+
+  card.appendChild(actions);
+
+  bubble.appendChild(label);
+  bubble.appendChild(card);
+  row.appendChild(bubble);
+  chatBox.appendChild(row);
+
+  chatBox.scrollTo({
+    top: chatBox.scrollHeight,
+    behavior: 'smooth'
+  });
+}

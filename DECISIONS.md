@@ -341,6 +341,157 @@ Implementar `HARDWARE_TOKEN_PROFILES` con límites de tokens diferentes según m
 
 ---
 
+## 📎 Adjuntos en chat
+
+### Decisión
+
+Permitir adjuntar archivos al chat usando `FormData` y `multer`.
+
+### Razón
+
+- Permite que Tempest use archivos como contexto.
+- Mejora la utilidad para analizar código, notas y documentos simples.
+- Prepara la base para visión y lectura avanzada de PDF.
+
+### Implementación
+
+Frontend:
+
+- `modules/attachments.js`
+- `fileInput`
+- chips visuales
+- drag & drop
+
+Backend:
+
+- `multer`
+- `uploads/attachments/`
+- `attachment.service.js`
+
+### Impacto
+
+- Tempest puede leer archivos de texto/código.
+- El usuario puede trabajar con archivos reales.
+- Aumenta el valor práctico del asistente.
+
+---
+
+## 📄 Documentos descargables
+
+### Decisión
+
+Agregar generación de documentos TXT, PDF y DOCX.
+
+### Razón
+
+- Permite convertir respuestas o instrucciones en archivos reales.
+- Mejora el uso de Tempest como herramienta de trabajo.
+- Permite entregar resultados descargables y reutilizables.
+
+### Implementación
+
+Endpoints:
+
+```text
+POST /document/generate
+GET /documents/:filename
+GET /documents/download/:filename
+```
+
+Servicio:
+
+```text
+backend/services/document.service.js
+```
+
+Salida:
+
+```text
+backend/outputs/documents/
+```
+
+Frontend:
+
+```text
+frontend/api.js
+frontend/ui.js
+frontend/app.js
+```
+
+### Impacto
+
+- Tempest puede crear documentos reales.
+- El usuario puede abrirlos o descargarlos.
+- Los documentos se limpian automáticamente después de 24 horas.
+
+---
+
+## 🎙️ Transcripción como documento descargable
+
+### Decisión
+
+Mejorar la transcripción para que genere una tarjeta descargable al finalizar.
+
+### Razón
+
+- Una URL en texto era poco clara.
+- El usuario necesita ver y descargar el resultado de forma directa.
+- La transcripción debe comportarse como un documento generado.
+
+### Implementación
+
+Modal con selección:
+
+- audio
+- modo de texto
+- formato
+
+Mensajes visuales:
+
+- inicio
+- finalización
+
+Tarjeta descargable con:
+
+- Ver documento
+- Descargar
+
+Limpieza de temporales en `finally`.
+
+### Impacto
+
+- Mejor UX.
+- Flujo más parecido a herramientas modernas de IA.
+- Menos archivos basura en `uploads`.
+
+---
+
+## 🤖 Separación de modelos por tarea
+
+### Decisión
+
+Usar modelos distintos según tipo de operación.
+
+```text
+Chat normal       → modelo seleccionado por usuario.
+Documentos        → modelo seleccionado por usuario.
+Transcripción     → Whisper fijo.
+```
+
+### Razón
+
+Los modelos Qwen/Hermes/Llama son modelos de texto. No transcriben audio.
+
+Whisper es un modelo especializado para audio.
+
+### Impacto
+
+- Evita errores al transcribir.
+- Mantiene control del usuario sobre chat/documentos.
+- Permite que transcripción sea estable y predecible.
+
+---
+
 ## 🔮 Decisiones futuras
 
 - Migrar memoria JSON a base de datos.

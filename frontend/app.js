@@ -8,11 +8,12 @@ import {
   deleteProject,
   renameChat,
   renameProject,
-  generateTitle
+  generateTitle,
+  generateDocument
 } from './api.js';
 
 import { setActiveChat, getChatState } from './chatState.js';
-import { addMessage } from './ui.js';
+import { addMessage, addDocumentCard } from './ui.js';
 import {
   HARDWARE_PROFILE,
   APP_MODE,
@@ -34,33 +35,37 @@ import {
   clearSelection
 } from './modules/sidebar.js';
 
-const chatBox        = document.getElementById('chatBox');
-const userInput      = document.getElementById('userInput');
-const sendBtn        = document.getElementById('sendBtn');
-const typing         = document.getElementById('typing');
-const menuTrigger    = document.getElementById('menuTrigger');
+import { initAttachments, getAttachedFiles, clearAttachedFiles } from './modules/attachments.js';
+
+const chatBox = document.getElementById('chatBox');
+const userInput = document.getElementById('userInput');
+const sendBtn = document.getElementById('sendBtn');
+const typing = document.getElementById('typing');
+const menuTrigger = document.getElementById('menuTrigger');
 const smartMenuPanel = document.getElementById('smartMenuPanel');
-const menuViewRoot   = document.getElementById('menuViewRoot');
-const menuViewLocal  = document.getElementById('menuViewLocal');
-const menuViewServices  = document.getElementById('menuViewServices');
-const menuViewOpenAI    = document.getElementById('menuViewOpenAI');
-const menuViewGoogle    = document.getElementById('menuViewGoogle');
-const toolMenuBtn    = document.getElementById('toolMenuBtn');
-const toolMenuPanel  = document.getElementById('toolMenuPanel');
-const transcriptionBtn        = document.getElementById('transcriptionBtn');
-const transcriptionModal      = document.getElementById('transcriptionModal');
+const menuViewRoot = document.getElementById('menuViewRoot');
+const menuViewLocal = document.getElementById('menuViewLocal');
+const menuViewServices = document.getElementById('menuViewServices');
+const menuViewOpenAI = document.getElementById('menuViewOpenAI');
+const menuViewGoogle = document.getElementById('menuViewGoogle');
+const toolMenuBtn = document.getElementById('toolMenuBtn');
+const toolMenuPanel = document.getElementById('toolMenuPanel');
+const addFileBtn = document.getElementById('addFileBtn');
+const fileInput = document.getElementById('fileInput');
+const transcriptionBtn = document.getElementById('transcriptionBtn');
+const transcriptionModal = document.getElementById('transcriptionModal');
 const transcriptionAudioInput = document.getElementById('transcriptionAudioInput');
-const transcriptionMode       = document.getElementById('transcriptionMode');
-const transcriptionFormat     = document.getElementById('transcriptionFormat');
-const cancelTranscriptionBtn  = document.getElementById('cancelTranscriptionBtn');
+const transcriptionMode = document.getElementById('transcriptionMode');
+const transcriptionFormat = document.getElementById('transcriptionFormat');
+const cancelTranscriptionBtn = document.getElementById('cancelTranscriptionBtn');
 const processTranscriptionBtn = document.getElementById('processTranscriptionBtn');
-const deleteConfirmModal  = document.getElementById('deleteConfirmModal');
-const deleteConfirmText   = document.getElementById('deleteConfirmText');
-const cancelDeleteBtn     = document.getElementById('cancelDeleteBtn');
-const confirmDeleteBtn    = document.getElementById('confirmDeleteBtn');
-const newProjectModal     = document.getElementById('newProjectModal');
+const deleteConfirmModal = document.getElementById('deleteConfirmModal');
+const deleteConfirmText = document.getElementById('deleteConfirmText');
+const cancelDeleteBtn = document.getElementById('cancelDeleteBtn');
+const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
+const newProjectModal = document.getElementById('newProjectModal');
 const newProjectNameInput = document.getElementById('newProjectNameInput');
-const cancelNewProjectBtn  = document.getElementById('cancelNewProjectBtn');
+const cancelNewProjectBtn = document.getElementById('cancelNewProjectBtn');
 const confirmNewProjectBtn = document.getElementById('confirmNewProjectBtn');
 
 let primaryModel = MODEL_PROFILES[HARDWARE_PROFILE][0].model;
@@ -84,11 +89,11 @@ const sidebarDeps = {
 function showMenuView(viewName) {
   [menuViewRoot, menuViewLocal, menuViewServices, menuViewOpenAI, menuViewGoogle]
     .forEach(view => view.classList.add('hidden'));
-  if (viewName === 'root')     menuViewRoot.classList.remove('hidden');
-  if (viewName === 'local')    menuViewLocal.classList.remove('hidden');
+  if (viewName === 'root') menuViewRoot.classList.remove('hidden');
+  if (viewName === 'local') menuViewLocal.classList.remove('hidden');
   if (viewName === 'services') menuViewServices.classList.remove('hidden');
-  if (viewName === 'openai')   menuViewOpenAI.classList.remove('hidden');
-  if (viewName === 'google')   menuViewGoogle.classList.remove('hidden');
+  if (viewName === 'openai') menuViewOpenAI.classList.remove('hidden');
+  if (viewName === 'google') menuViewGoogle.classList.remove('hidden');
 }
 
 menuTrigger.addEventListener('click', () => {
@@ -119,9 +124,9 @@ refreshLocalActiveState(menuViewLocal, primaryModel);
 document.querySelectorAll('.service-model').forEach(btn => {
   btn.addEventListener('click', () => {
     const service = btn.dataset.service;
-    const model   = btn.dataset.model;
+    const model = btn.dataset.model;
     assistantsState[service].enabled = true;
-    assistantsState[service].model   = model;
+    assistantsState[service].model = model;
     updateMenuTriggerLabel(menuTrigger, primaryModel, assistantsState);
     smartMenuPanel.classList.add('hidden');
   });
@@ -146,10 +151,30 @@ cancelTranscriptionBtn.addEventListener('click', () => transcriptionModal.classL
 
 processTranscriptionBtn.addEventListener('click', async () => {
   const file = transcriptionAudioInput.files[0];
-  if (!file) { alert('Selecciona un audio'); return; }
+
+  if (!file) {
+    alert('Selecciona un audio');
+    return;
+  }
+
+  const selectedMode = transcriptionMode.value;
+  const selectedFormat = transcriptionFormat.value;
 
   transcriptionModal.classList.add('hidden');
   await ensureGeneralChatExists();
+
+  const transcriptionTitlePrompt = [
+    'Transcripción de audio',
+    `Archivo: ${file.name}`,
+    `Formato: ${selectedFormat.toUpperCase()}`,
+    `Modo: ${selectedMode === 'timestamps' ? 'Con divisiones de tiempo' : 'Texto corrido'}`
+  ].join('\n');
+
+  addMessage(
+    chatBox,
+    'Tempest',
+    `🎙️ Estoy transcribiendo el audio.\n\nArchivo: ${file.name}\nFormato: ${selectedFormat.toUpperCase()}\nModo: ${selectedMode === 'timestamps' ? 'Con divisiones de tiempo' : 'Texto corrido'}\n\nEsto puede tardar según la duración del audio.`
+  );
 
   typing.textContent = 'Transcribiendo audio...';
   sendBtn.disabled = true;
@@ -158,19 +183,83 @@ processTranscriptionBtn.addEventListener('click', async () => {
 
   try {
     const data = await transcribeAudio(file, {
-      mode:   transcriptionMode.value,
-      format: transcriptionFormat.value
+      mode: selectedMode,
+      format: selectedFormat
     });
 
-    if (!data.ok) throw new Error(data.error || 'Error en transcripción');
+    if (!data.ok) {
+      throw new Error(data.error || 'Error en transcripción');
+    }
 
-    const finalUrl = `http://localhost:3005${data.transcription.fileUrl}`;
-    addMessage(chatBox, 'Tempest',
-      `Transcripción lista.\n\nAbrir archivo:\n${finalUrl}\n\nUbicación en Windows:\n${data.transcription.filePath}\n\n¿Quieres que analice la transcripción?`
+    addMessage(
+      chatBox,
+      'Tempest',
+      '✅ Transcripción finalizada. Ya generé el documento.'
     );
+
+    const transcription = data.transcription;
+    const filename = transcription.fileUrl.split('/').pop();
+
+    addDocumentCard(chatBox, {
+      title: 'Transcripción de audio',
+      format: transcription.format,
+      filename,
+      fileUrl: transcription.fileUrl,
+      downloadUrl: transcription.fileUrl,
+      previewText: [
+        `Archivo generado: ${filename}`,
+        `Formato: ${String(transcription.format || '').toUpperCase()}`,
+        `Modo: ${transcription.mode === 'timestamps' ? 'Con divisiones de tiempo' : 'Texto corrido'}`,
+        '',
+        transcription.message || 'Transcripción finalizada correctamente.'
+      ].join('\n')
+    });
+
+    if (pendingAutoRename) {
+      const renameTarget = { ...pendingAutoRename };
+
+      const titleData = await generateTitle(
+        transcriptionTitlePrompt,
+        renameTarget.type
+      );
+
+      if (titleData.ok && titleData.title) {
+        const chatsData = await listChats(renameTarget.projectId);
+
+        const existingChats = Array.isArray(chatsData.chats)
+          ? chatsData.chats.filter(c => c !== renameTarget.chatId)
+          : [];
+
+        const uniqueTitle = makeUniqueChatTitle(
+          titleData.title,
+          existingChats
+        );
+
+        await renameChat(
+          renameTarget.chatId,
+          uniqueTitle,
+          renameTarget.projectId
+        );
+
+        setActiveChat({
+          projectId: renameTarget.projectId,
+          chatId: uniqueTitle,
+          mode: renameTarget.projectId === 'general' ? 'chat' : 'project'
+        });
+
+        pendingAutoRename = null;
+        await loadSidebar(sidebarDeps);
+      }
+    }
+
   } catch (error) {
     console.error(error);
-    addMessage(chatBox, 'Tempest', 'Error procesando audio');
+
+    addMessage(
+      chatBox,
+      'Tempest',
+      '❌ Error procesando audio. Revisa que el archivo sea válido y que LocalAI/Whisper esté activo.'
+    );
   } finally {
     typing.textContent = '';
     sendBtn.disabled = false;
@@ -197,6 +286,13 @@ confirmDeleteBtn.onclick = async () => {
     clearSelection();
     deleteConfirmModal.classList.add('hidden');
     renderWelcomeScreen();
+    initAttachments({
+      fileInput,
+      addFileBtn,
+      attachmentPreview: document.getElementById('attachmentPreview'),
+      chatBox,
+      toolMenuPanel
+    });
     await loadSidebar(sidebarDeps);
     return;
   }
@@ -204,7 +300,7 @@ confirmDeleteBtn.onclick = async () => {
   const pending = getPendingDelete();
   if (!pending) return;
 
-  if (pending.type === 'chat')    await deleteChat(pending.id, pending.projectId);
+  if (pending.type === 'chat') await deleteChat(pending.id, pending.projectId);
   if (pending.type === 'project') await deleteProject(pending.id);
 
   setPendingDelete(null);
@@ -298,9 +394,45 @@ function makeUniqueChatTitle(title, existingChats) {
   return uniqueTitle;
 }
 
+function detectDocumentRequest(message) {
+  const text = String(message || '').toLowerCase();
+
+  const wantsDocument =
+    text.includes('documento') ||
+    text.includes('archivo') ||
+    text.includes('imprime') ||
+    text.includes('imprimir') ||
+    text.includes('genera un pdf') ||
+    text.includes('crea un pdf') ||
+    text.includes('genera un word') ||
+    text.includes('crea un word') ||
+    text.includes('hazme un pdf') ||
+    text.includes('hazme un word');
+
+  const wantsFormat =
+    text.includes('pdf') ||
+    text.includes('docx') ||
+    text.includes('word') ||
+    text.includes('txt');
+
+  if (!wantsDocument || !wantsFormat) return null;
+
+  let format = 'txt';
+
+  if (text.includes('pdf')) format = 'pdf';
+  if (text.includes('docx') || text.includes('word')) format = 'docx';
+  if (text.includes('txt')) format = 'txt';
+
+  return {
+    format
+  };
+}
+
 async function sendMessage() {
   const message = userInput.value.trim();
-  if (!message) return;
+  const files = getAttachedFiles();
+
+  if (!message && files.length === 0) return;
 
   await ensureGeneralChatExists();
 
@@ -315,18 +447,74 @@ async function sendMessage() {
     assistants: Object.entries(assistantsState).map(([provider, s]) => ({ provider, ...s }))
   };
 
-  addMessage(chatBox, 'Tú', message);
-  userInput.value = '';
-  autoResizeUserInput();
-  typing.textContent = 'Tempest está pensando...';
-  sendBtn.disabled = true;
-  userInput.disabled = true;
+  const visibleMessage = files.length > 0
+  ? `${message || 'Analiza los archivos adjuntos.'}\n\n📎 Archivos adjuntos: ${files.map(file => file.name).join(', ')}`
+  : message;
 
-  try {
-    const data = await sendChatMessage(message, config);
+addMessage(chatBox, 'Tú', visibleMessage);
+
+userInput.value = '';
+autoResizeUserInput();
+
+const documentRequest = detectDocumentRequest(message);
+
+typing.textContent = documentRequest
+  ? `Generando documento ${documentRequest.format.toUpperCase()}...`
+  : 'Tempest está pensando...';
+
+sendBtn.disabled = true;
+userInput.disabled = true;
+
+try {
+  if (documentRequest && files.length === 0) {
+    const data = await generateDocument(message, documentRequest.format, config);
+
+    if (data.ok && data.document) {
+      addDocumentCard(chatBox, data.document);
+
+      if (pendingAutoRename) {
+        const renameTarget = { ...pendingAutoRename };
+        const titleData = await generateTitle(message, renameTarget.type);
+
+        if (titleData.ok && titleData.title) {
+          const chatsData = await listChats(renameTarget.projectId);
+          const existingChats = Array.isArray(chatsData.chats)
+            ? chatsData.chats.filter(c => c !== renameTarget.chatId)
+            : [];
+
+          const uniqueTitle = makeUniqueChatTitle(titleData.title, existingChats);
+
+          await renameChat(renameTarget.chatId, uniqueTitle, renameTarget.projectId);
+
+          setActiveChat({
+            projectId: renameTarget.projectId,
+            chatId: uniqueTitle,
+            mode: renameTarget.projectId === 'general' ? 'chat' : 'project'
+          });
+
+          pendingAutoRename = null;
+          await loadSidebar(sidebarDeps);
+        }
+      }
+
+      return;
+    }
+
+    addMessage(chatBox, 'Tempest', 'No pude generar el documento: ' + (data.error || 'Error desconocido'));
+    return;
+  }
+
+  const data = await sendChatMessage(message || 'Analiza los archivos adjuntos.', config, files);
+
+    if (files.length > 0) {
+      clearAttachedFiles();
+      document.getElementById('attachmentPreview').innerHTML = '';
+      document.getElementById('attachmentPreview').classList.add('hidden');
+    }
 
     if (data.ok) {
       addMessage(chatBox, 'Tempest', data.reply);
+      
 
       if (pendingAutoRename) {
         const renameTarget = { ...pendingAutoRename };
@@ -377,4 +565,13 @@ userInput.addEventListener('keydown', (event) => {
 sendBtn.addEventListener('click', sendMessage);
 
 renderWelcomeScreen();
+
+initAttachments({
+  fileInput,
+  addFileBtn,
+  attachmentPreview: document.getElementById('attachmentPreview'),
+  chatBox,
+  toolMenuPanel
+});
+
 loadSidebar(sidebarDeps);

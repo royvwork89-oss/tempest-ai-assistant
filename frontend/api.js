@@ -1,17 +1,38 @@
 import { getMemoryQuery, getChatState } from './chatState.js';
 
-export async function sendChatMessage(message, config = {}) {
+export async function sendChatMessage(message, config = {}, files = []) {
   const state = getChatState();
+  const hasFiles = Array.isArray(files) && files.length > 0;
+
+  if (!hasFiles) {
+    const res = await fetch('/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message,
+        projectId: state.projectId,
+        chatId: state.chatId,
+        config
+      })
+    });
+
+    return res.json();
+  }
+
+  const formData = new FormData();
+
+  formData.append('message', message);
+  formData.append('projectId', state.projectId);
+  formData.append('chatId', state.chatId);
+  formData.append('config', JSON.stringify(config));
+
+  files.forEach(file => {
+    formData.append('attachments', file);
+  });
 
   const res = await fetch('/chat', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      message,
-      projectId: state.projectId,
-      chatId: state.chatId,
-      config
-    })
+    body: formData
   });
 
   return res.json();
@@ -130,6 +151,24 @@ export async function generateTitle(text, type = 'chat') {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ text, type })
+  });
+
+  return response.json();
+}
+
+export async function generateDocument(prompt, format = 'txt', config = {}) {
+  const state = getChatState();
+
+  const response = await fetch('/document/generate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      prompt,
+      format,
+      projectId: state.projectId,
+      chatId: state.chatId,
+      config
+    })
   });
 
   return response.json();
