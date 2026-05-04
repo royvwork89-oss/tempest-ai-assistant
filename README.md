@@ -21,7 +21,6 @@ Tempest es un asistente local de IA construido con Node.js, Express, LocalAI y f
 - 3 modelos por perfil de hardware: rápido, equilibrado, inteligente.
 - Modo automático que elige el modelo según el tipo de consulta.
 - Integración con LocalAI mediante nombres reales de modelo.
-- Cambio de modelo en tiempo real por chat.
 
 ### 🖥️ Perfiles de hardware
 
@@ -45,8 +44,6 @@ Tempest es un asistente local de IA construido con Node.js, Express, LocalAI y f
 
 ### 📁 Organización por proyectos
 
-Tempest permite organizar conversaciones en:
-
 ```text
 + Nuevo Chat
 chat independiente
@@ -56,11 +53,8 @@ proyecto
 └── chat del proyecto
 ```
 
-Cada proyecto funciona como un espacio de trabajo con sus propios chats.
-
 ### 🏷️ Renombrado inteligente
 
-- Los chats nuevos se crean desde pantalla inicial.
 - La primera consulta genera automáticamente el nombre del chat usando IA.
 - Los proyectos se nombran manualmente al crearlos.
 - Cada chat/proyecto puede renombrarse desde el menú lateral.
@@ -68,47 +62,35 @@ Cada proyecto funciona como un espacio de trabajo con sus propios chats.
 ### 🗑️ Eliminación segura
 
 - Cada chat/proyecto tiene menú de tres puntos.
-- Incluye opciones:
-  - Renombrar
-  - Eliminar
 - La eliminación usa modal de confirmación propio.
 
 ### 🎙️ Transcripción de audio
 
 - Procesamiento con ffmpeg + Whisper vía LocalAI.
 - División automática en fragmentos.
-- Exportación a:
-  - TXT
-  - PDF
-  - DOCX
+- Exportación a TXT, PDF y DOCX.
 
 ### 🤖 Control avanzado de respuestas IA
 
 - Detección automática de respuestas incompletas.
 - Regeneración inteligente de archivos cortados.
-- Unión limpia de múltiples respuestas.
-- Prevención de duplicados en bloques de código.
 - Soporte para generación de múltiples archivos en una sola petición.
 
 ### ⚙️ Selección automática de modelo
 
-- Elección dinámica del modelo según el tipo de consulta.
-- Consultas complejas (código, arquitectura, explicaciones) → modelo inteligente.
-- Consultas medias (ejemplos, comparaciones) → modelo equilibrado.
-- Consultas simples (conversación, preguntas cortas) → modelo rápido.
+- Consultas complejas → modelo inteligente.
+- Consultas medias → modelo equilibrado.
+- Consultas simples → modelo rápido.
 
 ### 🔥 Gestión dinámica de tokens
 
-- Ajuste automático de `max_tokens` según el tipo de solicitud y hardware.
-- Más tokens para generación de código.
-- Menos tokens para conversación normal.
+- Ajuste automático de `max_tokens` según tipo de solicitud y hardware.
 - Perfiles separados por modelo y perfil de hardware.
 
 ### ⏱️ Control de timeouts
 
 - Timeout de 120 segundos por petición a LocalAI.
 - AbortController para cancelar peticiones colgadas.
-- Timeout independiente para petición de continuación de respuesta.
 
 ---
 
@@ -135,6 +117,10 @@ backend/
 │   ├── chat.routes.js
 │   └── transcription.routes.js
 ├── services/
+│   ├── localai/
+│   │   ├── memory.answers.js
+│   │   ├── response.validator.js
+│   │   └── token.profiles.js
 │   ├── localai.service.js
 │   ├── memory.service.js
 │   └── transcription.service.js
@@ -146,6 +132,9 @@ backend/
 └── server.js
 
 frontend/
+├── modules/
+│   ├── models.js
+│   └── sidebar.js
 ├── index.html
 ├── app.js
 ├── api.js
@@ -188,61 +177,32 @@ POST /transcribe
 
 ## ⚙️ Tecnologías utilizadas
 
-- Node.js
-- Express
-- LocalAI
-- GGUF models
-- Whisper
-- ffmpeg
-- JavaScript
-- PDFKit
-- docx
-- HTML/CSS
-- Docker
+- Node.js, Express, LocalAI, GGUF models, Whisper, ffmpeg
+- JavaScript, HTML/CSS, Docker, PDFKit, docx
 
 ---
 
 ## 🚀 Cómo ejecutar el proyecto
 
-### 1. Instalar dependencias
-
 ```bash
-cd backend
-npm install
+# 1. Instalar dependencias
+cd backend && npm install
+
+# 2. Iniciar LocalAI
+cd docker && docker compose up -d
+
+# 3. Iniciar backend
+cd backend && node server.js
+
+# 4. Abrir frontend en http://localhost:3005
 ```
 
-### 2. Ejecutar LocalAI
+### Cambiar perfil de hardware
 
-```bash
-cd docker
-docker compose up -d
-```
-
-LocalAI queda disponible en:
-
-```text
-http://localhost:8080
-```
-
-### 3. Ejecutar backend
-
-```bash
-cd backend
-node server.js
-```
-
-### 4. Abrir frontend
-
-```text
-http://localhost:3005
-```
-
-### 5. Cambiar perfil de hardware
-
-En `frontend/app.js` línea 50:
+**Archivo:** `frontend/modules/models.js` línea 1:
 
 ```js
-const HARDWARE_PROFILE = 'laptop'; // o 'desktop'
+export const HARDWARE_PROFILE = 'laptop'; // o 'desktop'
 ```
 
 ---
@@ -251,7 +211,7 @@ const HARDWARE_PROFILE = 'laptop'; // o 'desktop'
 
 - Node.js
 - ffmpeg instalado y en PATH
-- Docker con soporte NVIDIA (runtime: nvidia)
+- Docker con soporte NVIDIA
 - Drivers NVIDIA actualizados
 - Modelos GGUF descargados en `models-localai/`
 - YAMLs de configuración por modelo en `models-localai/`
@@ -260,7 +220,7 @@ const HARDWARE_PROFILE = 'laptop'; // o 'desktop'
 
 ## 🧠 Estado del proyecto
 
-Versión actual: **v0.3.5**
+Versión actual: **v0.3.6**
 
 Tempest ya cuenta con:
 
@@ -269,13 +229,11 @@ Tempest ya cuenta con:
 - sidebar con proyectos y chats
 - renombrar/eliminar chats y proyectos
 - generación automática de títulos de chat
-- transcripción de audio
-- exportación de transcripciones
+- transcripción de audio y exportación TXT/PDF/DOCX
 - renderizado de bloques de código estilo terminal
 - botón para copiar código generado dentro de bloques
 - input multilínea con `Shift + Enter`
 - textarea autoexpandible con límite de altura
-- estructura visual preparada para adjuntar archivos/imágenes en el futuro
 - modo selección para eliminar múltiples chats independientes
 - botones de acción por mensaje
 - 6 modelos configurados (3 laptop + 3 desktop)
@@ -284,16 +242,17 @@ Tempest ya cuenta con:
 - timeouts con AbortController para peticiones a LocalAI
 - YAMLs con templates correctos para todos los modelos
 - docker-compose con soporte NVIDIA
+- módulos backend separados en `services/localai/`
+- módulos frontend separados en `frontend/modules/`
+- styles.css limpio sin reglas duplicadas
 
 ---
 
 ## 🔮 Próximos pasos
 
 - Generar título de chat en background sin bloquear la conversación.
-- Separar archivos grandes en módulos más pequeños.
 - Implementar subida y vista previa de archivos/imágenes.
 - Añadir resaltado de sintaxis para bloques de código.
-- Añadir validación avanzada de nombres.
 - Añadir resumen automático por chat/proyecto.
 - Añadir búsqueda en historial.
 - Migrar persistencia a base de datos.
