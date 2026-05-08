@@ -59,6 +59,8 @@ Sistema funcional con:
 - [ ] Validar nombres para evitar caracteres inválidos
 - [ ] Evitar nombres duplicados de chats/proyectos
 - [ ] Mejorar renombrado automático de chats
+- [ ] Renombrar chat cuando el primer mensaje es solo un archivo adjunto sin texto
+- [ ] Usar modelo más ligero para generación de títulos (evitar usar el modelo principal)
 - [ ] Permitir renombrado automático opcional de proyectos
 - [ ] Añadir opción de cancelar creación de chat pendiente
 - [ ] Mejorar visual de proyecto activo/chat activo
@@ -141,8 +143,24 @@ Sistema funcional con:
 
 ---
 
-## 🚀 Futuro post v1.0
+## 🎯 v1.0 — Uso diario real
 
+Tempest funciona como cualquier IA básica para investigar y programar sin problemas.
+
+- [ ] Streaming de respuesta (texto aparece palabra por palabra)
+- [ ] Modal propio para renombrar — reemplazar el prompt() nativo por un modal visual
+- [ ] Mejorar prompt del generador de títulos — que sea más rápido y preciso
+- [ ] Renombrar chat cuando el primer mensaje es solo archivo adjunto sin texto — lógica de cuándo disparar el renombrado
+- [ ] Validación de nombres para caracteres inválidos
+- [ ] Manejo de errores visual
+
+---
+
+## 🔮 vX.x
+- [ ] Lectura de PPTX (extracción XML de ZIP)
+- [ ] Configurar modelo especializado en código (Qwen2.5-Coder-14B) como opción en el menú
+- [ ] Añadir respaldo/exportación de memoria
+- [ ] LibreOffice headless para extracción de documentos de alta fidelidad
 - [ ] Función de voz al chat: hablar → texto → consulta
 - [ ] Stream de audio en vivo con Faster-Whisper
 - [ ] Migrar JSON a SQLite/PostgreSQL
@@ -152,4 +170,3 @@ Sistema funcional con:
 - [ ] Añadir app desktop con Electron
 - [ ] Añadir sincronización opcional
 - [ ] Añadir respaldo/exportación de memoria
-- [ ] LibreOffice headless para extracción de documentos de alta fidelidad
