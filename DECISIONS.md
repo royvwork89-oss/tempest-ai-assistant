@@ -7,497 +7,200 @@ Este documento registra las decisiones técnicas principales tomadas durante el 
 ## 🧠 Uso de LocalAI como motor principal
 
 ### Decisión
-
 Usar LocalAI como motor principal de inferencia.
 
 ### Razón
-
-- independencia de servicios externos
-- privacidad
-- ejecución local
-- sin costo por token
-- control sobre modelos GGUF
+- Independencia de servicios externos, privacidad, ejecución local, sin costo por token, control sobre modelos GGUF.
 
 ### Impacto
-
-- más control
-- mayor complejidad técnica
-- menor potencia que modelos comerciales grandes
+- Más control, mayor complejidad técnica, menor potencia que modelos comerciales grandes.
 
 ---
 
 ## ⚙️ Backend en Node.js + Express
 
 ### Decisión
-
 Construir el backend con Node.js y Express.
 
 ### Razón
-
-- simple de depurar
-- alineado con JavaScript del frontend
-- buena base para APIs REST
-- modularización clara
+- Simple de depurar, alineado con JavaScript del frontend, buena base para APIs REST, modularización clara.
 
 ### Impacto
-
-- desarrollo rápido
-- fácil expansión
-- buen proyecto de portafolio backend
+- Desarrollo rápido, fácil expansión, buen proyecto de portafolio backend.
 
 ---
 
 ## 🧩 Arquitectura modular
 
 ### Decisión
-
-Separar el backend en:
-
-- routes
-- controllers
-- services
-- utils
-- config
-
-### Razón
-
-- mejorar orden
-- evitar archivos gigantes
-- facilitar mantenimiento
+Separar el backend en routes / controllers / services / utils / config.
 
 ### Impacto
-
-- código más profesional
-- cambios localizados
-- base preparada para crecer
+- Código más profesional, cambios localizados, base preparada para crecer.
 
 ---
 
 ## 🧠 Memoria jerárquica
 
 ### Decisión
-
-Separar memoria en tres niveles:
-
-```text
-Usuario → Proyecto → Chat
-```
+Separar memoria en tres niveles: Usuario → Proyecto → Chat.
 
 ### Razón
-
-- evitar mezclar conversaciones
-- permitir proyectos con múltiples chats
-- mantener contexto global del usuario
-- aislar historiales individuales
+- Evitar mezclar conversaciones, permitir proyectos con múltiples chats, aislar historiales individuales.
 
 ### Impacto
-
-- mejor organización
-- experiencia parecida a ChatGPT
-- base para multiusuario real
+- Mejor organización, experiencia parecida a ChatGPT, base para multiusuario real.
 
 ---
 
 ## 📁 Uso de JSON para persistencia inicial
 
 ### Decisión
-
 Guardar memoria, proyectos y chats en archivos JSON.
 
 ### Razón
-
-- fácil de inspeccionar
-- rápido de implementar
-- ideal para MVP local
-- no requiere base de datos todavía
+- Fácil de inspeccionar, rápido de implementar, ideal para MVP local.
 
 ### Impacto
-
-- depuración sencilla
-- estructura visible
-- futura migración necesaria a DB si crece
+- Depuración sencilla, futura migración necesaria a DB si crece.
 
 ---
 
 ## 💬 Chats independientes y chats por proyecto
 
 ### Decisión
-
-Permitir dos tipos de conversación:
-
-- chats sin proyecto en `general`
-- chats ligados a proyectos
-
-### Razón
-
-- separar trabajo rápido de trabajo organizado
-- replicar flujo moderno tipo workspace
-- facilitar contexto por proyecto
+Permitir dos tipos de conversación: chats sin proyecto en `general` y chats ligados a proyectos.
 
 ### Impacto
-
-- mejor UX
-- mejor organización
-- más lógica en frontend y memoria
+- Mejor UX, mejor organización, más lógica en frontend y memoria.
 
 ---
 
 ## 🏷️ Renombrado automático con IA
 
 ### Decisión
-
 Usar la primera consulta para generar título automático del chat.
 
-### Razón
-
-- evitar nombres genéricos tipo `chat-123`
-- mejorar navegación
-- experiencia más natural
-
 ### Impacto
-
-- sidebar más útil
-- requiere endpoint `/title/generate`
-- depende de LocalAI
-
----
-
-## ✏️ Renombrar y eliminar desde sidebar
-
-### Decisión
-
-Añadir menú de tres puntos en chats y proyectos.
-
-### Razón
-
-- dar control al usuario
-- evitar borrar manualmente archivos
-- acercar la UI a herramientas modernas
-
-### Impacto
-
-- UX más completa
-- requiere endpoints de rename/delete
-- necesita validación de nombres
+- Sidebar más útil, requiere endpoint `/title/generate`, depende de LocalAI.
 
 ---
 
 ## 🧾 Modal propio para confirmación
 
 ### Decisión
-
 Usar un modal interno en lugar de `confirm()` del navegador.
 
-### Razón
-
-- mejor estética
-- coherencia visual
-- más control de UI
-
 ### Impacto
-
-- interfaz más profesional
-- más código frontend
+- Interfaz más profesional, más código frontend.
 
 ---
 
 ## 🎙️ Transcripción local
 
 ### Decisión
-
 Implementar transcripción con ffmpeg + LocalAI Whisper.
 
-### Razón
-
-- evitar APIs externas
-- mantener procesamiento local
-- reutilizar LocalAI
-
 ### Impacto
-
-- mayor privacidad
-- mayor carga técnica
-- requiere limpieza de temporales
+- Mayor privacidad, mayor carga técnica, requiere limpieza de temporales.
 
 ---
 
-## 🤖 Selección dinámica de modelos
+## 📎 Sistema de adjuntos con extracción de texto
 
 ### Decisión
-
-Permitir cambiar el modelo de IA desde el frontend y enviarlo dinámicamente al backend.
+Extraer texto de los archivos adjuntos en el backend e inyectarlo al prompt como contexto plano, en lugar de enviar el archivo directamente a LocalAI.
 
 ### Razón
-
-- aprovechar múltiples modelos locales
-- adaptar rendimiento según hardware (laptop vs desktop)
-- mejorar flexibilidad del sistema
-- preparar base para selección automática
+- LocalAI solo recibe texto. No puede procesar archivos binarios directamente.
+- Mantiene la arquitectura simple: el modelo solo ve texto bien estructurado.
+- Permite truncado inteligente antes de enviar al modelo.
 
 ### Impacto
-
-- mayor control del usuario
-- integración directa con LocalAI
-- necesidad de validar modelos disponibles
-- base para futuras estrategias inteligentes de selección
+- LocalAI puede "leer" documentos sin soporte nativo de archivos.
+- Diferencia entre calidad de extracción según tipo de archivo.
+- Requiere librerías específicas por formato.
 
 ---
 
-## 🤖 Control de respuestas incompletas
+## 📎 Librerías de extracción por tipo de archivo
 
 ### Decisión
-
-Implementar lógica backend para detectar y corregir respuestas incompletas de la IA.
+- **PDF**: `pdf2json` — descartados `pdf-parse` (bug de exports en versiones recientes) y `pdfjs-dist` (ruta `/legacy/build/pdf.js` eliminada en v5.x).
+- **DOCX**: `mammoth` — extracción limpia de texto plano.
+- **XLSX**: `xlsx` — conversión por hoja a CSV, cada hoja etiquetada.
+- **Imágenes**: placeholder con metadata (nombre, tamaño, tipo). LocalAI no analiza imágenes visualmente.
 
 ### Razón
-
-- Los modelos locales pueden cortar respuestas.
-- Generación de múltiples archivos es inestable.
-- No se puede confiar únicamente en el modelo.
-
-### Implementación
-
-- Detección de cortes (`looksLikeCutReply`)
-- Eliminación de bloques incompletos (`removeIncompleteFileBlock`)
-- Regeneración parcial en lugar de continuación directa
-
-### Impacto
-
-- Respuestas más completas
-- Menos errores en código generado
-- Mayor confiabilidad del sistema
+- `pdf-parse` falla con `Package subpath './lib/pdf-parse.js' is not defined by exports`.
+- `pdfjs-dist` v5.x eliminó la ruta legacy usada en Node.js.
+- `pdf2json` funciona nativamente sin problemas de exports.
 
 ---
 
-## 🖥️ Perfiles de hardware con 3 modelos por equipo
+## 📎 Truncado inteligente diferenciado
 
 ### Decisión
-
-Definir 3 modelos por perfil de hardware: rápido, equilibrado, inteligente.
+Truncar de forma diferente según el tipo de archivo:
+- **Código**: 60% cabecera (imports/firmas) + 30% final (donde suelen estar los bugs).
+- **Documentos**: 65% inicio + 25% final.
+- Límite: 7500 caracteres.
 
 ### Razón
-
-- cada equipo tiene capacidades diferentes
-- evitar sobrecargar hardware con modelos demasiado grandes
-- dar opciones sin abrumar al usuario
-
-### Implementación
-
-**Laptop (RTX 4050):**
-- Rápido: `qwen2.5-3b-q4`
-- Equilibrado: `qwen2.5-3b-q5`
-- Inteligente: `llama-3.2-3b-q4`
-
-**Desktop (RTX 4070):**
-- Rápido: `hermes-q4`
-- Equilibrado: `hermes-q5`
-- Inteligente: `hermes-q6`
-
-### Impacto
-
-- experiencia adaptada a cada equipo
-- mejor aprovechamiento del hardware
-- cambio de perfil con una sola línea en el frontend
+- Evitar enviar contexto infinito al modelo.
+- Preservar las partes más útiles según el tipo de contenido.
 
 ---
 
-## ⏱️ Timeouts con AbortController
+## 📎 Limpieza de temporales en doble capa
 
 ### Decisión
-
-Agregar AbortController con timeout de 120 segundos a cada petición fetch hacia LocalAI.
+- **Capa A**: limpieza inmediata en bloque `finally` tras cada request.
+- **Capa B**: job escoba con `setInterval` cada 6h que borra archivos con más de 24h en `uploads/attachments/`.
 
 ### Razón
-
-- LocalAI puede tardar en cargar modelos la primera vez (warmup)
-- sin timeout Node.js queda colgado indefinidamente
-- mejora la experiencia cuando el modelo está ocupado
-
-### Impacto
-
-- errores más claros cuando LocalAI no responde
-- evita que el servidor quede bloqueado
-- timeout independiente para petición principal y petición de continuación
+- La Capa A puede fallar si el proceso se interrumpe.
+- La Capa B actúa como red de seguridad.
 
 ---
 
-## 📋 Perfiles de tokens por modelo y hardware
+## 📎 chatHistory vs workingMemory para adjuntos
 
 ### Decisión
-
-Implementar `HARDWARE_TOKEN_PROFILES` con límites de tokens diferentes según modelo, hardware y tipo de tarea.
+- `chatHistory` guarda el mensaje completo incluyendo el bloque `--- ARCHIVOS ADJUNTOS ---`.
+- `workingMemory` guarda el contexto extraído por separado.
 
 ### Razón
-
-- modelos pequeños necesitan menos tokens para no generar ruido
-- código necesita más tokens que conversación normal
-- cada hardware tiene diferente capacidad de VRAM
-
-### Impacto
-
-- respuestas más eficientes
-- menos cortes en generación de código
-- base para ajuste fino por tarea
+- Permite que preguntas de seguimiento ("¿puedes resumir la sección 3?") tengan acceso al contenido del archivo.
+- Evitar duplicar el bloque en memoria de trabajo.
 
 ---
 
-## 📎 Adjuntos en chat
+## 🤖 Modelos Q4, Q5 y Q6
 
 ### Decisión
-
-Permitir adjuntar archivos al chat usando `FormData` y `multer`.
-
-### Razón
-
-- Permite que Tempest use archivos como contexto.
-- Mejora la utilidad para analizar código, notas y documentos simples.
-- Prepara la base para visión y lectura avanzada de PDF.
-
-### Implementación
-
-Frontend:
-
-- `modules/attachments.js`
-- `fileInput`
-- chips visuales
-- drag & drop
-
-Backend:
-
-- `multer`
-- `uploads/attachments/`
-- `attachment.service.js`
-
-### Impacto
-
-- Tempest puede leer archivos de texto/código.
-- El usuario puede trabajar con archivos reales.
-- Aumenta el valor práctico del asistente.
-
----
-
-## 📄 Documentos descargables
-
-### Decisión
-
-Agregar generación de documentos TXT, PDF y DOCX.
+Soportar tres perfiles de calidad de modelo GGUF: Q4 (rápido), Q5 (equilibrado), Q6 (calidad).
 
 ### Razón
+- Dar flexibilidad según recursos disponibles.
 
-- Permite convertir respuestas o instrucciones en archivos reales.
-- Mejora el uso de Tempest como herramienta de trabajo.
-- Permite entregar resultados descargables y reutilizables.
-
-### Implementación
-
-Endpoints:
-
-```text
-POST /document/generate
-GET /documents/:filename
-GET /documents/download/:filename
-```
-
-Servicio:
-
-```text
-backend/services/document.service.js
-```
-
-Salida:
-
-```text
-backend/outputs/documents/
-```
-
-Frontend:
-
-```text
-frontend/api.js
-frontend/ui.js
-frontend/app.js
-```
-
-### Impacto
-
-- Tempest puede crear documentos reales.
-- El usuario puede abrirlos o descargarlos.
-- Los documentos se limpian automáticamente después de 24 horas.
-
----
-
-## 🎙️ Transcripción como documento descargable
-
-### Decisión
-
-Mejorar la transcripción para que genere una tarjeta descargable al finalizar.
-
-### Razón
-
-- Una URL en texto era poco clara.
-- El usuario necesita ver y descargar el resultado de forma directa.
-- La transcripción debe comportarse como un documento generado.
-
-### Implementación
-
-Modal con selección:
-
-- audio
-- modo de texto
-- formato
-
-Mensajes visuales:
-
-- inicio
-- finalización
-
-Tarjeta descargable con:
-
-- Ver documento
-- Descargar
-
-Limpieza de temporales en `finally`.
-
-### Impacto
-
-- Mejor UX.
-- Flujo más parecido a herramientas modernas de IA.
-- Menos archivos basura en `uploads`.
-
----
-
-## 🤖 Separación de modelos por tarea
-
-### Decisión
-
-Usar modelos distintos según tipo de operación.
-
-```text
-Chat normal       → modelo seleccionado por usuario.
-Documentos        → modelo seleccionado por usuario.
-Transcripción     → Whisper fijo.
-```
-
-### Razón
-
-Los modelos Qwen/Hermes/Llama son modelos de texto. No transcriben audio.
-
-Whisper es un modelo especializado para audio.
-
-### Impacto
-
-- Evita errores al transcribir.
-- Mantiene control del usuario sobre chat/documentos.
-- Permite que transcripción sea estable y predecible.
+### Fix aplicado
+- El nombre de archivo en los YAML usaba guión en lugar de punto antes de Q5/Q6.
+- `n_gpu_layers` debe ir dentro de `parameters`, no como campo raíz.
 
 ---
 
 ## 🔮 Decisiones futuras
 
+- Implementar PPTX con extracción XML de ZIP.
+- Implementar LibreOffice headless desde Node para mejor calidad de extracción.
+- **Modo híbrido de modelos:**
+  - LocalAI con Qwen2.5-Coder-14B para código rutinario, refactorización simple y trabajo del día a día.
+  - Claude API / OpenAI API para arquitectura compleja, problemas difíciles o cuando el modelo local no alcanza.
+  - Selección manual desde el menú o automática según complejidad de la consulta.
 - Migrar memoria JSON a base de datos.
 - Añadir login real.
 - Añadir resumen automático por chat/proyecto.
 - Añadir embeddings para búsqueda semántica.
-- Añadir renombrado automático de proyectos opcional.
-- Separar módulos grandes en archivos más pequeños.
-- Generar título de chat en background sin bloquear.
+- Función de voz al chat: hablar → texto → consulta.
+- Stream de audio en vivo con Faster-Whisper.

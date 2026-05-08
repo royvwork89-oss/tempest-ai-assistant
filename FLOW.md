@@ -4,79 +4,40 @@
 
 1. Usuario escribe mensaje.
 2. Frontend valida que no esté vacío.
-3. Si el modo es automático, se detecta el tipo de consulta y se elige el modelo.
-4. Si no hay chat activo, se crea uno en el contexto correcto.
-5. Frontend envía `POST /chat` incluyendo modelo seleccionado y perfil de hardware.
-6. Backend recibe mensaje, modelo y perfil de hardware.
-7. Backend verifica si la respuesta puede darse sin llamar a LocalAI.
-8. Si requiere IA, construye el historial y llama a LocalAI con timeout.
-9. LocalAI genera respuesta.
-10. Backend guarda mensaje y respuesta.
-11. Frontend renderiza respuesta.
+3. Si no hay chat activo, se crea uno en el contexto correcto.
+4. Frontend envía `POST /chat`.
+5. Backend recibe mensaje y memoria activa.
+6. Backend envía contexto a LocalAI.
+7. LocalAI genera respuesta.
+8. Backend guarda mensaje y respuesta.
+9. Frontend renderiza respuesta.
 
 ---
 
-## 🤖 Flujo de selección automática de modelo
+## 📎 Flujo de chat con archivos adjuntos
 
-1. Usuario selecciona modo `Automático` en el menú.
-2. Al enviar mensaje, el frontend analiza el texto.
-3. Si contiene palabras clave complejas como código, arquitectura, explicación detallada o paso a paso, se elige modelo inteligente.
-4. Si contiene palabras medias como ejemplo, comparar, recomienda o cómo hacer algo, se elige modelo equilibrado.
-5. Si es conversación simple, se elige modelo rápido.
-6. El modelo seleccionado se muestra en el botón del menú cuando el modo dev está activo.
-7. Se envía al backend como `primaryModel`.
-
----
-
-## 🤖 Flujo con control de respuesta IA
-
-1. Backend recibe respuesta del modelo.
-2. Se limpia el contenido con `cleanReply`.
-3. Se analiza si la respuesta está incompleta con `looksLikeCutReply`.
-4. Si está incompleta:
-   - se elimina el bloque corrupto con `removeIncompleteFileBlock`
-   - se solicita regeneración del archivo faltante con nuevo AbortController
-5. Se recibe nueva respuesta.
-6. Se unen ambas respuestas de forma limpia.
-7. Se entrega resultado final completo al frontend.
-
----
-
-## ⏱️ Flujo de timeout
-
-1. Se crea un AbortController antes del fetch a LocalAI.
-2. Se inicia un timer de 120 segundos.
-3. Si LocalAI responde antes, se cancela el timer.
-4. Si LocalAI no responde en 120 segundos, se aborta la petición.
-5. El error se propaga al controlador y se devuelve error 500 al frontend.
+1. Usuario adjunta archivos (botón + o drag & drop).
+2. Frontend muestra chips visuales de los archivos.
+3. Al enviar, `api.js` construye un `FormData` con el mensaje y los archivos.
+4. Backend recibe la petición via multer, guarda temporales en `uploads/attachments/`.
+5. `attachment.service.js` valida cada archivo (mimetype + extensión + magic bytes para PDF).
+6. Se extrae texto según tipo: pdf2json / mammoth / xlsx / fs.readFile / placeholder imagen.
+7. El texto se trunca inteligentemente según tipo (código o documento).
+8. Se construye el bloque `--- ARCHIVOS ADJUNTOS ---` y se inyecta al prompt.
+9. `chatHistory` guarda el mensaje completo con el bloque de adjuntos.
+10. LocalAI recibe el contexto completo y responde.
+11. Bloque `finally`: `cleanupFiles` elimina los temporales (Capa A).
+12. Frontend renderiza la respuesta.
 
 ---
 
 ## 🧠 Flujo con memoria
 
-1. Frontend envía:
-   - `userId`
-   - `projectId`
-   - `chatId`
-2. Backend localiza:
-   - memoria global del usuario
-   - memoria de proyecto
-   - memoria del chat
+1. Frontend envía `userId`, `projectId` y `chatId`.
+2. Backend localiza memoria global, de proyecto y de chat.
 3. Se construye contexto.
 4. Se consulta LocalAI.
 5. Se actualiza `chatHistory`.
-
----
-
-## 💬 Flujo de respuestas sin IA
-
-Algunas respuestas se generan sin llamar a LocalAI:
-
-- saludos simples como `hola`, `buenas`, `hey`
-- hora actual
-- consultas explícitas de memoria como `qué sabes de mí`, `qué me gusta`
-
-Esto hace que esas respuestas sean instantáneas y no dependan de que LocalAI esté cargado.
 
 ---
 
@@ -144,93 +105,33 @@ Esto hace que esas respuestas sean instantáneas y no dependan de que LocalAI es
 
 ---
 
-## 📎 Flujo de adjuntos
-
-1. Usuario abre el menú de herramientas.
-2. Selecciona `Añadir archivo`.
-3. Frontend abre `fileInput`.
-4. Usuario selecciona uno o varios archivos.
-5. `frontend/modules/attachments.js` guarda los archivos en memoria local del frontend.
-6. Se muestran chips/previews en el input.
-7. Al enviar mensaje, `frontend/api.js` usa `FormData`.
-8. Backend recibe archivos con `multer`.
-9. `backend/services/attachment.service.js` lee archivos de texto/código soportados.
-10. El contenido se agrega como contexto al mensaje enviado a LocalAI.
-11. La respuesta se renderiza en el chat.
-12. El frontend limpia los adjuntos visuales.
-
-Formatos leídos como texto:
-
-```text
-.txt
-.md
-.json
-.js
-.css
-.html
-.py
-.ts
-```
-
----
-
-## 📄 Flujo de generación de documentos
-
-1. Usuario escribe una instrucción como:
-   - `Crea un documento PDF sobre LocalAI`
-   - `Hazme un documento Word sobre Tempest`
-   - `Imprime como TXT una explicación corta`
-2. `frontend/app.js` detecta la intención con `detectDocumentRequest()`.
-3. Se identifica el formato:
-   - `txt`
-   - `pdf`
-   - `docx`
-4. Frontend llama a `generateDocument()` en `frontend/api.js`.
-5. `api.js` envía `POST /document/generate`.
-6. Backend genera el contenido con LocalAI.
-7. `backend/services/document.service.js` normaliza y limpia el contenido.
-8. Se crea el archivo en `backend/outputs/documents/`.
-9. Backend responde con:
-   - `fileUrl`
-   - `downloadUrl`
-   - `filename`
-   - `previewText`
-10. Frontend muestra `addDocumentCard()`.
-11. Usuario puede abrir o descargar el documento.
-
----
-
 ## 🎙️ Flujo de transcripción de audio
 
-1. Usuario abre menú de herramientas `+`.
+1. Usuario abre menú de herramientas (+).
 2. Selecciona `Transcripción`.
-3. Se abre el modal de transcripción.
-4. Usuario selecciona archivo de audio.
-5. Usuario elige tipo de texto:
-   - texto corrido
-   - con divisiones de tiempo
-6. Usuario elige formato de salida:
-   - TXT
-   - PDF
-   - DOCX
-7. Frontend crea chat si no existe.
-8. Frontend muestra mensaje:
-   `🎙️ Estoy transcribiendo el audio.`
-9. Frontend envía `POST /transcribe`.
-10. Backend guarda audio temporal en `backend/uploads/audio/`.
-11. Backend divide audio en chunks usando ffmpeg.
-12. Chunks se guardan temporalmente en `backend/uploads/chunks/`.
-13. Backend transcribe fragmentos usando Whisper vía LocalAI.
-14. Backend une la transcripción.
-15. Backend genera archivo final en:
-   `backend/outputs/transcriptions/`
-16. Backend elimina:
-   - audio original
-   - chunks temporales
-17. Frontend muestra mensaje:
-   `✅ Transcripción finalizada. Ya generé el documento.`
-18. Frontend muestra tarjeta descargable.
-19. Si el chat era nuevo, se renombra automáticamente usando IA.
+3. Selecciona audio.
+4. Elige modo y formato.
+5. Frontend envía `POST /transcribe`.
+6. Backend guarda audio temporal.
+7. ffmpeg divide en fragmentos.
+8. LocalAI Whisper transcribe fragmentos.
+9. Backend une resultados.
+10. Se genera archivo TXT/PDF/DOCX.
+11. Se devuelve URL pública.
+12. Frontend muestra ruta y link.
+
+---
+
+## 🧹 Flujo de limpieza de temporales
+
+**Capa A — inmediata:**
+- Tras cada request en `chat.controller.js`, el bloque `finally` llama a `cleanupFiles`.
+- Borra todos los archivos subidos en esa petición.
+
+**Capa B — job escoba:**
+- `server.js` ejecuta `setInterval` cada 6 horas.
+- Recorre `uploads/attachments/` y elimina archivos con más de 24h de antigüedad.
+- Actúa como red de seguridad si la Capa A falla.
 
 ---
 
@@ -238,11 +139,9 @@ Formatos leídos como texto:
 
 - Mensaje vacío.
 - Error de conexión con backend.
-- Timeout de LocalAI.
 - Error de LocalAI.
-- Modelo no disponible.
-- Archivo no seleccionado.
-- Error en carga de adjuntos.
-- Error en generación de documentos.
+- Error de archivo no seleccionado.
 - Error en transcripción.
 - Nombre de chat/proyecto repetido.
+- Archivo con mimetype o extensión no permitida.
+- Error de extracción de texto (PDF corrupto, DOCX dañado, etc.).

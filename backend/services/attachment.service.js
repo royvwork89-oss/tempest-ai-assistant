@@ -1,88 +1,359 @@
 const fs = require('fs');
 const path = require('path');
 
-const TEXT_EXTENSIONS = new Set([
-  '.txt',
-  '.md',
-  '.json',
-  '.js',
-  '.css',
-  '.html',
-  '.py',
-  '.ts'
+// ─── Configuración ────────────────────────────────────────────────────────────
+
+const MAX_CHARS = 7500;
+
+const ALLOWED_MIMETYPES = new Set([
+  'text/plain',
+  'text/markdown',
+  'text/html',
+  'text/css',
+  'text/javascript',
+  'application/javascript',
+  'application/typescript',
+  'application/json',
+  'application/pdf',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-excel',
+  'image/png',
+  'image/jpeg',
+  'image/gif',
+  'image/webp'
 ]);
 
-const MAX_FILE_CHARS = 8000;
-const MAX_TOTAL_CHARS = 24000;
+const ALLOWED_EXTENSIONS = new Set([
+  '.txt', '.md', '.html', '.css', '.js', '.ts', '.jsx', '.tsx',
+  '.json', '.yaml', '.yml', '.xml', '.csv', '.py', '.java',
+  '.c', '.cpp', '.h', '.cs', '.php', '.rb', '.go', '.rs',
+  '.sh', '.bash', '.env', '.ini', '.toml', '.sql',
+  '.pdf', '.docx', '.xlsx',
+  '.png', '.jpg', '.jpeg', '.gif', '.webp'
+]);
 
-function safeReadTextFile(filePath) {
+const TEXT_EXTENSIONS = new Set([
+  '.txt', '.md', '.html', '.css', '.js', '.ts', '.jsx', '.tsx',
+  '.json', '.yaml', '.yml', '.xml', '.csv', '.py', '.java',
+  '.c', '.cpp', '.h', '.cs', '.php', '.rb', '.go', '.rs',
+  '.sh', '.bash', '.env', '.ini', '.toml', '.sql'
+]);
+
+const CODE_EXTENSIONS = new Set([
+  '.js', '.ts', '.jsx', '.tsx', '.py', '.java', '.c', '.cpp',
+  '.h', '.cs', '.php', '.rb', '.go', '.rs', '.sh', '.bash', '.sql'
+]);
+
+const IMAGE_EXTENSIONS = new Set([
+  '.png', '.jpg', '.jpeg', '.gif', '.webp'
+]);
+
+// ─── Validación ───────────────────────────────────────────────────────────────
+
+function isAllowedFile(file) {
+  const ext = path.extname(file.originalname).toLowerCase();
+
+  if (!ALLOWED_EXTENSIONS.has(ext)) return false;
+  if (!ALLOWED_MIMETYPES.has(file.mimetype)) {
+    // Algunos sistemas reportan mimetypes genéricos para texto
+    // aceptar si la extensión está en lista blanca de texto
+    if (!TEXT_EXTENSIONS.has(ext)) return false;
+  }
+
+  // Magic bytes básicos para PDF
+  if (ext === '.pdf') {
+    try {
+      const buf = Buffer.alloc(4);
+      const fd = fs.openSync(file.path, 'r');
+      fs.readSync(fd, buf, 0, 4, 0);
+      fs.closeSync(fd);
+      if (buf.toString('ascii') !== '%PDF') return false;
+    } catch {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+// ─── Truncado inteligente ─────────────────────────────────────────────────────
+
+function truncateCode(text, maxChars) {
+  if (text.length <= maxChars) return { text, truncated: false };
+
+  const lines = text.split('\n');
+  const total = text.length;
+  const headLines = [];
+  const tailLines = [];
+  let headChars = 0;
+  let tailChars = 0;
+  const budget = Math.floor(maxChars * 0.6); // 60% cabecera
+  const tailBudget = Math.floor(maxChars * 0.3); // 30% final
+
+  // Cabecera: imports + primeras firmas
+  for (const line of lines) {
+    if (headChars + line.length > budget) break;
+    headLines.push(line);
+    headChars += line.length + 1;
+  }
+
+  // Final: últimas líneas (donde suelen vivir los bugs)
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const line = lines[i];
+    if (tailChars + line.length > tailBudget) break;
+    tailLines.unshift(line);
+    tailChars += line.length + 1;
+  }
+
+  const result = [
+    ...headLines,
+    `\n[... TRUNCADO: se enviaron ~${maxChars} de ${total} caracteres. ` +
+    `Di "continuar con el archivo" si necesitas más. ...]\n`,
+    ...tailLines
+  ].join('\n');
+
+  return { text: result, truncated: true, original: total };
+}
+
+function truncateDocument(text, maxChars) {
+  if (text.length <= maxChars) return { text, truncated: false };
+
+  const total = text.length;
+  const headBudget = Math.floor(maxChars * 0.65);
+  const tailBudget = Math.floor(maxChars * 0.25);
+
+  const head = text.slice(0, headBudget);
+  const tail = text.slice(-tailBudget);
+
+  const result =
+    head +
+    `\n\n[... TRUNCADO: se enviaron ~${maxChars} de ${total} caracteres. ` +
+    `Di "continuar con el archivo" si necesitas más. ...]\n\n` +
+    tail;
+
+  return { text: result, truncated: true, original: total };
+}
+
+function smartTruncate(text, ext) {
+  if (CODE_EXTENSIONS.has(ext)) return truncateCode(text, MAX_CHARS);
+  return truncateDocument(text, MAX_CHARS);
+}
+
+// ─── Extracción de texto ──────────────────────────────────────────────────────
+
+async function extractText(file) {
+  const ext = path.extname(file.originalname).toLowerCase();
+  const name = file.originalname;
+
+  // Imagen — placeholder con metadata
+  if (IMAGE_EXTENSIONS.has(ext)) {
+    const sizeKB = (file.size / 1024).toFixed(1);
+    return {
+      name,
+      type: 'image',
+      content:
+        `[Imagen adjunta: ${name} | Tamaño: ${sizeKB} KB | Tipo: ${file.mimetype}]\n` +
+        `[El modelo actual no puede analizar imágenes visualmente. ` +
+        `Si necesitas que analice esta imagen, descríbela con tus palabras.]`,
+      truncated: false
+    };
+  }
+
+  // PDF
+  if (ext === '.pdf') {
+    try {
+      const PDFParser = require('pdf2json');
+
+      const raw = await new Promise((resolve, reject) => {
+        const parser = new PDFParser(null, 1);
+
+        parser.on('pdfParser_dataReady', () => {
+          resolve(parser.getRawTextContent());
+        });
+
+        parser.on('pdfParser_dataError', (err) => {
+          reject(new Error(err.parserError || 'Error al parsear PDF'));
+        });
+
+        parser.loadPDF(file.path);
+      });
+
+      const { text, truncated, original } = truncateDocument(raw, MAX_CHARS);
+      return { name, type: 'pdf', content: text, truncated, original };
+
+    } catch (err) {
+      return {
+        name,
+        type: 'pdf',
+        content: `[Error al extraer texto del PDF: ${name}. ${err.message}]`,
+        truncated: false
+      };
+    }
+  }
+
+  // DOCX
+  if (ext === '.docx') {
+    try {
+      const mammoth = require('mammoth');
+      const result = await mammoth.extractRawText({ path: file.path });
+      const raw = result.value || '';
+      const { text, truncated, original } = truncateDocument(raw, MAX_CHARS);
+
+      return { name, type: 'docx', content: text, truncated, original };
+    } catch (err) {
+      return {
+        name,
+        type: 'docx',
+        content: `[Error al extraer texto del DOCX: ${name}. ${err.message}]`,
+        truncated: false
+      };
+    }
+  }
+
+  // XLSX
+if (ext === '.xlsx') {
   try {
-    return fs.readFileSync(filePath, 'utf8');
-  } catch (error) {
-    console.error('No se pudo leer archivo adjunto:', error);
-    return '';
+    const XLSX = require('xlsx');
+    const workbook = XLSX.readFile(file.path);
+    let raw = '';
+
+    workbook.SheetNames.forEach(sheetName => {
+      const sheet = workbook.Sheets[sheetName];
+      const csv = XLSX.utils.sheet_to_csv(sheet, { blankrows: false });
+      if (csv.trim()) {
+        raw += `[Hoja: ${sheetName}]\n${csv}\n\n`;
+      }
+    });
+
+    const { text, truncated, original } = truncateDocument(raw, MAX_CHARS);
+    return { name, type: 'xlsx', content: text, truncated, original };
+
+  } catch (err) {
+    return {
+      name,
+      type: 'xlsx',
+      content: `[Error al extraer texto del Excel: ${name}. ${err.message}]`,
+      truncated: false
+    };
   }
 }
 
-function buildAttachmentContext(files = []) {
-  if (!Array.isArray(files) || files.length === 0) return '';
+  // Texto plano / código
+  if (TEXT_EXTENSIONS.has(ext)) {
+    try {
+      const raw = fs.readFileSync(file.path, 'utf-8');
+      const { text, truncated, original } = smartTruncate(raw, ext);
 
-  let totalChars = 0;
-
-  const blocks = files.map((file, index) => {
-    const originalName = file.originalname || `archivo-${index + 1}`;
-    const ext = path.extname(originalName).toLowerCase();
-    const sizeKb = Math.round((file.size || 0) / 1024);
-
-    if (!TEXT_EXTENSIONS.has(ext)) {
-      return [
-        `Archivo ${index + 1}: ${originalName}`,
-        `Tipo: ${file.mimetype || 'desconocido'}`,
-        `Tamaño: ${sizeKb} KB`,
-        `Nota: este archivo fue recibido, pero Tempest todavía no puede leer su contenido directamente.`
-      ].join('\n');
+      return { name, type: 'text', content: text, truncated, original };
+    } catch (err) {
+      return {
+        name,
+        type: 'text',
+        content: `[Error al leer el archivo: ${name}. ${err.message}]`,
+        truncated: false
+      };
     }
+  }
 
-    let content = safeReadTextFile(file.path);
-
-    if (!content.trim()) {
-      return [
-        `Archivo ${index + 1}: ${originalName}`,
-        'Nota: el archivo parece estar vacío o no se pudo leer.'
-      ].join('\n');
-    }
-
-    content = content.slice(0, MAX_FILE_CHARS);
-
-    const remaining = MAX_TOTAL_CHARS - totalChars;
-    if (remaining <= 0) {
-      return [
-        `Archivo ${index + 1}: ${originalName}`,
-        'Nota: no se agregó contenido porque se alcanzó el límite total de texto adjunto.'
-      ].join('\n');
-    }
-
-    content = content.slice(0, remaining);
-    totalChars += content.length;
-
-    return [
-      `Archivo ${index + 1}: ${originalName}`,
-      `Extensión: ${ext}`,
-      'Contenido:',
-      '```',
-      content,
-      '```'
-    ].join('\n');
-  });
-
-  return [
-    'CONTEXTO DE ARCHIVOS ADJUNTOS:',
-    'El usuario adjuntó los siguientes archivos. Úsalos como contexto para responder.',
-    '',
-    blocks.join('\n\n---\n\n')
-  ].join('\n');
+  // Tipo no soportado (no debería llegar aquí si isAllowedFile funciona)
+  return {
+    name,
+    type: 'unsupported',
+    content: `[Archivo no soportado: ${name}]`,
+    truncated: false
+  };
 }
 
+// ─── Construcción del bloque de contexto ─────────────────────────────────────
+
+async function buildAttachmentContext(files) {
+  if (!Array.isArray(files) || files.length === 0) return null;
+
+  const validFiles = files.filter(isAllowedFile);
+
+  if (validFiles.length === 0) return null;
+
+  const extractions = await Promise.all(validFiles.map(extractText));
+
+  const blocks = extractions.map((item, i) =>
+    `[Archivo ${i + 1}: ${item.name}]\n${item.content}`
+  );
+
+  return (
+    `--- ARCHIVOS ADJUNTOS ---\n\n` +
+    blocks.join('\n\n') +
+    `\n\n--- FIN DE ARCHIVOS ---`
+  );
+}
+
+// ─── Referencia limpia para chatHistory ──────────────────────────────────────
+// Devuelve solo nombres, sin el contenido, para guardar en chatHistory
+
+function getAttachmentNames(files) {
+  if (!Array.isArray(files) || files.length === 0) return [];
+  return files.filter(isAllowedFile).map(f => f.originalname);
+}
+
+// ─── Limpieza de archivos temporales ─────────────────────────────────────────
+
+function cleanupFiles(files) {
+  if (!Array.isArray(files)) return;
+
+  files.forEach(file => {
+    try {
+      if (file.path && fs.existsSync(file.path)) {
+        fs.unlinkSync(file.path);
+      }
+    } catch (err) {
+      console.warn(`[attachment.service] No se pudo borrar: ${file.path}`, err.message);
+    }
+  });
+}
+
+// ─── Job escoba (Capa B) ──────────────────────────────────────────────────────
+// Llama esto desde server.js con setInterval
+
+function startCleanupJob(attachmentsDir, maxAgeHours = 24) {
+  const maxAgeMs = maxAgeHours * 60 * 60 * 1000;
+
+  return () => {
+    try {
+      if (!fs.existsSync(attachmentsDir)) return;
+
+      const files = fs.readdirSync(attachmentsDir);
+      const now = Date.now();
+      let count = 0;
+
+      files.forEach(filename => {
+        const filePath = path.join(attachmentsDir, filename);
+        try {
+          const stat = fs.statSync(filePath);
+          if (now - stat.mtimeMs > maxAgeMs) {
+            fs.unlinkSync(filePath);
+            count++;
+          }
+        } catch {
+          // archivo ya borrado o sin permisos, ignorar
+        }
+      });
+
+      if (count > 0) {
+        console.log(`[attachment.service] Escoba: ${count} archivo(s) eliminado(s) de uploads/attachments/`);
+      }
+    } catch (err) {
+      console.warn('[attachment.service] Error en job escoba:', err.message);
+    }
+  };
+}
+
+// ─── Exports ──────────────────────────────────────────────────────────────────
+
 module.exports = {
-  buildAttachmentContext
+  isAllowedFile,
+  extractText,
+  buildAttachmentContext,
+  getAttachmentNames,
+  cleanupFiles,
+  startCleanupJob
 };

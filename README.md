@@ -1,6 +1,6 @@
 # 🚀 Tempest AI Assistant
 
-Tempest es un asistente local de IA construido con Node.js, Express, LocalAI y frontend web. Permite conversar con modelos locales, organizar chats por proyectos, mantener memoria persistente, adjuntar archivos como contexto, generar documentos descargables y transcribir audio a TXT, PDF o DOCX.
+Tempest es un asistente local de IA construido con Node.js, Express, LocalAI y frontend web. Permite conversar con modelos locales, organizar chats por proyectos, mantener memoria persistente, transcribir audio a texto y analizar archivos adjuntos.
 
 ---
 
@@ -13,32 +13,23 @@ Tempest es un asistente local de IA construido con Node.js, Express, LocalAI y f
 - Chats independientes.
 - Chats agrupados por proyecto.
 - Historial persistente por chat.
-- Respuestas renderizadas en burbujas de conversación.
-- Acciones por mensaje.
 
-### 🧠 Selección de modelos locales
+### 📎 Archivos adjuntos
 
-- Selector dinámico de modelos desde el frontend.
-- Soporte para múltiples perfiles de hardware: laptop / desktop.
-- 3 modelos por perfil de hardware: rápido, equilibrado, inteligente.
-- Modo automático que elige el modelo según el tipo de consulta.
-- Integración con LocalAI mediante nombres reales de modelo.
-- Los documentos usan el modelo seleccionado en la interfaz.
-- La transcripción usa Whisper fijo, no el modelo de chat.
-
-### 🖥️ Perfiles de hardware
-
-**Laptop (RTX 4050):**
-
-- Rápido: `qwen2.5-3b-q4`
-- Equilibrado: `qwen2.5-3b-q5`
-- Inteligente: `llama-3.2-3b-q4`
-
-**Desktop (RTX 4070):**
-
-- Rápido: `hermes-q4`
-- Equilibrado: `hermes-q5`
-- Inteligente: `hermes-q6`
+- Soporte para múltiples archivos por mensaje (hasta 8, máx 10MB cada uno).
+- Drag & drop sobre el chat o el área de input.
+- Preview visual con chips (imagen, nombre, botón de eliminar).
+- Extracción de texto e inyección al contexto de LocalAI.
+- Tipos soportados:
+  - **Texto/código**: TXT, MD, HTML, CSS, JS, TS, JSX, TSX, JSON, YAML, XML, CSV, PY, JAVA, C, CPP, H, CS, PHP, RB, GO, RS, SH, BASH, ENV, INI, TOML, SQL
+  - **Documentos**: PDF (pdf2json), DOCX (mammoth), XLSX (xlsx)
+  - **Imágenes**: PNG, JPG, GIF, WEBP (placeholder con metadata)
+- Truncado inteligente diferenciado:
+  - Código: 60% cabecera + 30% final con aviso de truncado
+  - Documentos: 65% inicio + 25% final con aviso de truncado
+- Limpieza automática de temporales en doble capa:
+  - Capa A: inmediata en `finally` tras cada petición
+  - Capa B: job escoba cada 6h borra archivos con más de 24h
 
 ### 🧠 Sistema de memoria
 
@@ -49,6 +40,8 @@ Tempest es un asistente local de IA construido con Node.js, Express, LocalAI y f
 - Persistencia en archivos JSON.
 
 ### 📁 Organización por proyectos
+
+Tempest permite organizar conversaciones en:
 
 ```text
 + Nuevo Chat
@@ -64,218 +57,17 @@ proyecto
 - La primera consulta genera automáticamente el nombre del chat usando IA.
 - Los proyectos se nombran manualmente al crearlos.
 - Cada chat/proyecto puede renombrarse desde el menú lateral.
-- Las transcripciones también pueden activar renombrado automático cuando inician un chat nuevo.
 
 ### 🗑️ Eliminación segura
 
-- Cada chat/proyecto tiene menú de tres puntos.
-- La eliminación usa modal de confirmación propio.
-- Existe modo de selección para eliminar múltiples chats independientes.
-
-### 📎 Adjuntos en chat
-
-Tempest permite adjuntar archivos desde el menú de herramientas o arrastrarlos al área del chat/input.
-
-Archivos involucrados:
-
-```text
-frontend/modules/attachments.js
-backend/services/attachment.service.js
-backend/routes/chat.routes.js
-backend/controllers/chat.controller.js
-```
-
-Formatos leídos como texto:
-
-```text
-.txt
-.md
-.json
-.js
-.css
-.html
-.py
-.ts
-```
-
-Los archivos de texto/código son procesados por el backend y enviados como contexto a LocalAI.
-
-Los archivos adjuntos se almacenan temporalmente en:
-
-```text
-backend/uploads/attachments/
-```
-
-Archivos no textuales como imágenes o PDF pueden adjuntarse, pero su lectura avanzada queda pendiente.
-
-### 📄 Generación de documentos
-
-Tempest permite generar archivos descargables desde una instrucción del usuario.
-
-Formatos soportados:
-
-```text
-TXT
-PDF
-DOCX
-```
-
-Endpoint principal:
-
-```text
-POST /document/generate
-```
-
-Endpoints de acceso:
-
-```text
-GET /documents/:filename
-GET /documents/download/:filename
-```
-
-Archivos involucrados:
-
-```text
-backend/controllers/document.controller.js
-backend/routes/document.routes.js
-backend/services/document.service.js
-frontend/api.js
-frontend/ui.js
-frontend/app.js
-```
-
-Salida generada en:
-
-```text
-backend/outputs/documents/
-```
-
-El frontend renderiza los documentos mediante una tarjeta visual con:
-
-```text
-Ver documento
-Descargar
-```
-
-Los documentos generados son temporales y se eliminan automáticamente después de 24 horas.
-
-El modelo usado para generar documentos es el modelo seleccionado en la interfaz. Si no se recibe modelo desde el frontend, se usa fallback por perfil de hardware:
-
-```text
-desktop → hermes-q5
-laptop  → qwen2.5-3b-q4
-```
+- Menú de tres puntos con opciones Renombrar / Eliminar.
+- Modal de confirmación propio.
 
 ### 🎙️ Transcripción de audio
 
-Tempest permite transcribir audio mediante Whisper vía LocalAI.
-
-Endpoint principal:
-
-```text
-POST /transcribe
-```
-
-Archivos involucrados:
-
-```text
-backend/controllers/transcription.controller.js
-backend/routes/transcription.routes.js
-backend/services/transcription.service.js
-frontend/api.js
-frontend/app.js
-frontend/ui.js
-```
-
-Modelo usado:
-
-```text
-ggml-whisper-base.bin
-```
-
-Modos de transcripción:
-
-```text
-plain       → texto corrido
-timestamps  → texto con divisiones de tiempo
-```
-
-Formatos de salida:
-
-```text
-TXT
-PDF
-DOCX
-```
-
-Carpetas usadas durante el proceso:
-
-```text
-backend/uploads/audio/
-backend/uploads/chunks/
-backend/outputs/transcriptions/
-```
-
-Flujo implementado:
-
-```text
-audio → chunks → Whisper → texto final → TXT/PDF/DOCX → tarjeta descargable
-```
-
-El frontend muestra mensajes visuales durante el proceso:
-
-```text
-🎙️ Estoy transcribiendo el audio.
-✅ Transcripción finalizada. Ya generé el documento.
-```
-
-Al finalizar, se renderiza una tarjeta con:
-
-```text
-Ver documento
-Descargar
-```
-
-Después del proceso, el backend elimina automáticamente:
-
-```text
-backend/uploads/audio/
-backend/uploads/chunks/
-```
-
-La transcripción también activa el renombrado automático del chat cuando se inicia desde una conversación nueva.
-
-### 🤖 Modelos por tipo de tarea
-
-```text
-Chat normal    → modelo seleccionado en la interfaz
-Documentos     → modelo seleccionado en la interfaz
-Transcripción  → modelo Whisper fijo
-```
-
-La transcripción no usa modelos de chat porque Qwen, Hermes y Llama son modelos de texto. Para audio se usa Whisper.
-
-### 🤖 Control avanzado de respuestas IA
-
-- Detección automática de respuestas incompletas.
-- Regeneración inteligente de archivos cortados.
-- Soporte para generación de múltiples archivos en una sola petición.
-
-### ⚙️ Selección automática de modelo
-
-- Consultas complejas → modelo inteligente.
-- Consultas medias → modelo equilibrado.
-- Consultas simples → modelo rápido.
-
-### 🔥 Gestión dinámica de tokens
-
-- Ajuste automático de `max_tokens` según tipo de solicitud y hardware.
-- Perfiles separados por modelo y perfil de hardware.
-
-### ⏱️ Control de timeouts
-
-- Timeout de 120 segundos por petición a LocalAI.
-- AbortController para cancelar peticiones colgadas.
+- Procesamiento con ffmpeg + Whisper vía LocalAI.
+- División automática en fragmentos.
+- Exportación a TXT, PDF y DOCX.
 
 ---
 
@@ -287,38 +79,31 @@ backend/
 │   └── systemPrompt.js
 ├── controllers/
 │   ├── chat.controller.js
-│   ├── document.controller.js
 │   └── transcription.controller.js
 ├── data/
 │   └── users/
 │       └── local-user/
 │           ├── profile.json
 │           └── projects/
-│               ├── general/
-│               │   ├── projectMemory.json
-│               │   └── chats/
 │               └── project-name/
 │                   ├── projectMemory.json
 │                   └── chats/
 ├── outputs/
-│   ├── documents/
 │   └── transcriptions/
 ├── routes/
 │   ├── chat.routes.js
-│   ├── document.routes.js
 │   └── transcription.routes.js
 ├── services/
+│   ├── attachment.service.js       ← extracción de texto de adjuntos
+│   ├── localai.service.js
 │   ├── localai/
 │   │   ├── memory.answers.js
 │   │   ├── response.validator.js
 │   │   └── token.profiles.js
-│   ├── attachment.service.js
-│   ├── document.service.js
-│   ├── localai.service.js
 │   ├── memory.service.js
 │   └── transcription.service.js
 ├── uploads/
-│   ├── attachments/
+│   ├── attachments/                ← archivos temporales de adjuntos
 │   ├── audio/
 │   └── chunks/
 ├── utils/
@@ -336,17 +121,6 @@ frontend/
 ├── chatState.js
 ├── ui.js
 └── styles.css
-
-models-localai/
-├── hermes-q4.yaml
-├── hermes-q5.yaml
-├── hermes-q6.yaml
-├── llama-3.2-3b-q4.yaml
-├── qwen2.5-3b-q4.yaml
-└── qwen2.5-3b-q5.yaml
-
-docker/
-└── docker-compose.yml
 ```
 
 ---
@@ -360,62 +134,53 @@ GET  /chats
 POST /chat/create
 POST /chat/delete
 POST /chat/rename
-
 GET  /projects
 POST /project/create
 POST /project/delete
 POST /project/rename
-
 POST /title/generate
-
 POST /transcribe
-
-POST /document/generate
-GET  /documents/:filename
-GET  /documents/download/:filename
 ```
 
 ---
 
 ## ⚙️ Tecnologías utilizadas
 
-- Node.js
-- Express
-- LocalAI
-- GGUF models
-- Whisper
+- Node.js + Express
+- LocalAI + modelos GGUF (Q4, Q5, Q6)
+- Whisper vía LocalAI
 - ffmpeg
-- JavaScript
-- HTML/CSS
-- Docker
-- PDFKit
-- docx
-- multer
-- FormData
+- JavaScript vanilla
+- pdf2json, mammoth, xlsx
+- PDFKit, docx
 
 ---
 
 ## 🚀 Cómo ejecutar el proyecto
 
+### 1. Instalar dependencias
+
 ```bash
-# 1. Instalar dependencias
-cd backend && npm install
-
-# 2. Iniciar LocalAI
-cd docker && docker compose up -d
-
-# 3. Iniciar backend
-cd backend && node server.js
-
-# 4. Abrir frontend en http://localhost:3005
+cd backend
+npm install
 ```
 
-### Cambiar perfil de hardware
+### 2. Ejecutar LocalAI
 
-**Archivo:** `frontend/modules/models.js`
+```text
+http://localhost:8080
+```
 
-```js
-export const HARDWARE_PROFILE = 'laptop'; // o 'desktop'
+### 3. Ejecutar backend
+
+```bash
+node server.js
+```
+
+### 4. Abrir frontend
+
+```text
+http://localhost:3005
 ```
 
 ---
@@ -424,65 +189,58 @@ export const HARDWARE_PROFILE = 'laptop'; // o 'desktop'
 
 - Node.js
 - ffmpeg instalado y en PATH
-- Docker con soporte NVIDIA
-- Drivers NVIDIA actualizados
-- Modelos GGUF descargados en `models-localai/`
-- YAMLs de configuración por modelo en `models-localai/`
-- Modelo Whisper disponible para transcripción
+- Docker/LocalAI funcionando
+- Modelo de chat configurado (Q4, Q5 o Q6)
+- Modelo Whisper configurado para transcripción
 
 ---
 
 ## 🧠 Estado del proyecto
 
-Versión actual: **v0.3.9**
+Versión actual: **v0.4.1**
 
-Tempest ya cuenta con:
+Tempest cuenta con:
 
-- Chat local funcional.
-- Memoria por usuario/proyecto/chat.
-- Sidebar con proyectos y chats.
-- Renombrar/eliminar chats y proyectos.
-- Generación automática de títulos de chat.
-- Renombrado automático tras transcripción.
-- Transcripción de audio con exportación TXT/PDF/DOCX.
-- Mensajes visuales de inicio y finalización de transcripción.
-- Tarjetas descargables para documentos y transcripciones.
-- Generación de documentos TXT/PDF/DOCX.
-- Adjuntos en chat.
-- Drag & drop de archivos.
-- Lectura de archivos de texto/código como contexto.
-- Renderizado de bloques de código estilo terminal.
-- Botón para copiar código generado dentro de bloques.
-- Input multilínea con `Shift + Enter`.
-- Textarea autoexpandible con límite de altura.
-- Modo selección para eliminar múltiples chats independientes.
-- Botones de acción por mensaje.
-- 6 modelos configurados: 3 laptop + 3 desktop.
-- Selección automática de modelo según tipo de consulta.
-- Perfiles de tokens por modelo y hardware.
-- Timeouts con AbortController para peticiones a LocalAI.
-- YAMLs con templates correctos para todos los modelos.
-- Docker-compose con soporte NVIDIA.
-- Módulos backend separados en `services/localai/`.
-- Módulos frontend separados en `frontend/modules/`.
+- Chat local funcional con memoria por usuario/proyecto/chat
+- Sidebar con proyectos y chats
+- Renombrar/eliminar chats y proyectos
+- Generación automática de títulos de chat
+- Transcripción de audio con exportación TXT/PDF/DOCX
+- Renderizado de bloques de código estilo terminal
+- Botón para copiar código dentro de bloques
+- Input multilínea con `Shift + Enter`
+- Textarea autoexpandible con límite de altura
+- Modo selección para eliminar múltiples chats independientes
+- Botones de acción por mensaje (copiar, editar*, compartir*, reintentar*)
+- **Adjuntos funcionales**: PDF, DOCX, XLSX, TXT, código, imágenes
+- **Modelos Q4, Q5 y Q6 funcionando**
+- **Historial de conversación corregido** (sin duplicados)
+
+*preparado para futuro
 
 ---
 
 ## 🔮 Próximos pasos
 
-- Generar título de chat en background sin bloquear la conversación.
-- Leer PDF como texto.
-- Añadir soporte de visión para imágenes.
-- Añadir resaltado de sintaxis para bloques de código.
-- Mejorar formato visual de PDF.
-- Mejorar formato visual de DOCX.
-- Permitir crear documentos desde una respuesta previa.
-- Detectar instrucciones de documentos como “2 páginas”, “con portada” o “formato profesional”.
-- Añadir resumen automático por chat/proyecto.
-- Añadir búsqueda en historial.
-- Migrar persistencia a base de datos.
-- Añadir login real.
-- Convertir en app desktop con Electron.
+**Para v1.0:**
+- Modal propio para renombrar (reemplazar `prompt()` nativo)
+- Validación de nombres para caracteres inválidos
+- Manejo de errores visual
+
+**Integración de modelos:**
+- Configurar Qwen2.5-Coder-14B para trabajo de código rutinario
+- Integrar Claude API y OpenAI API para problemas complejos
+- Modo híbrido: LocalAI para trabajo del día a día, API externa cuando el modelo local no alcanza
+
+**Post v1.0:**
+- Función de voz al chat (hablar → texto → consulta)
+- Stream de audio en vivo con Faster-Whisper
+- Implementar lectura de PPTX
+- LibreOffice headless para mejor extracción de documentos
+- Añadir resumen automático por chat/proyecto
+- Migrar persistencia a base de datos
+- Añadir login real
+- Convertir en app desktop con Electron
 
 ---
 
@@ -491,9 +249,3 @@ Tempest ya cuenta con:
 **Rogelio Peña López**
 
 Backend Developer enfocado en Node.js, IA local, automatización y sistemas conversacionales.
-
----
-
-## ⭐ Nota
-
-Este proyecto forma parte de mi portafolio como desarrollador backend y demuestra integración de IA local, arquitectura modular, memoria persistente, organización multi-contexto, adjuntos, generación de documentos y transcripción local con Whisper.

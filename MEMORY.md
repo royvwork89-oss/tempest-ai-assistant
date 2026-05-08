@@ -31,54 +31,31 @@ Usuario
 ### 1. Memoria global de usuario
 
 Archivo:
-
 ```text
 backend/data/users/local-user/profile.json
 ```
 
-Guarda información general del usuario:
-
-- nombre
-- gustos
-- metas
-- preferencias
-- proyecto actual
-- datos persistentes útiles
-
-Esta memoria puede ser usada por cualquier chat del usuario.
+Guarda información general del usuario: nombre, gustos, metas, preferencias, proyecto actual.
 
 ---
 
 ### 2. Memoria de proyecto
 
 Archivo:
-
 ```text
 backend/data/users/local-user/projects/{projectId}/projectMemory.json
 ```
 
-Guarda información compartida por todos los chats de un proyecto.
-
-Ejemplo:
-
-- objetivo del proyecto
-- decisiones técnicas
-- contexto común
-- resumen del proyecto
-
-Cualquier chat dentro del mismo proyecto puede usar esta memoria.
+Guarda información compartida por todos los chats de un proyecto: objetivo, decisiones técnicas, contexto común, resumen.
 
 ---
 
 ### 3. Memoria de chat
 
 Archivo:
-
 ```text
 backend/data/users/local-user/projects/{projectId}/chats/{chatId}.json
 ```
-
-Guarda información propia de una conversación específica:
 
 ```json
 {
@@ -89,9 +66,7 @@ Guarda información propia de una conversación específica:
 }
 ```
 
-Regla clave:
-
-> Un chat solo puede leer su propio historial. No puede leer el historial de otros chats, aunque estén dentro del mismo proyecto.
+**Regla clave:** un chat solo puede leer su propio historial.
 
 ---
 
@@ -99,34 +74,11 @@ Regla clave:
 
 ### Chat sin proyecto
 
-Pertenece al proyecto especial:
-
-```text
-general
-```
-
-Puede acceder a:
-
-- memoria global del usuario
-- memoria de `general`
-- su propia memoria de chat
-
-No accede a chats de proyectos.
-
----
+Pertenece al proyecto especial `general`. Puede acceder a memoria global + memoria de `general` + su propia memoria de chat.
 
 ### Chat dentro de proyecto
 
-Puede acceder a:
-
-- memoria global del usuario
-- memoria del proyecto
-- su propia memoria de chat
-
-No accede a:
-
-- historial de otros chats
-- memoria de otros proyectos
+Puede acceder a memoria global + memoria del proyecto + su propia memoria de chat. No accede a historial de otros chats ni memoria de otros proyectos.
 
 ---
 
@@ -145,23 +97,26 @@ No accede a:
 
 ---
 
+## 📎 Memoria y archivos adjuntos
+
+Cuando el mensaje incluye archivos adjuntos:
+
+- `chatHistory` guarda el mensaje completo incluyendo el bloque `--- ARCHIVOS ADJUNTOS ---` con el texto extraído.
+- Esto permite que preguntas de seguimiento ("resume la sección 3") tengan acceso al contenido del archivo.
+- `workingMemory` guarda el contexto extraído por separado para no inflar la memoria de trabajo.
+- Los archivos temporales se eliminan tras cada request — el contenido persiste solo en `chatHistory`.
+
+---
+
 ## 🧠 Memoria de trabajo
 
 `workingMemory` representa contexto corto, útil para mantener continuidad reciente sin enviar conversaciones infinitas.
-
-Objetivo:
-
-- evitar crecimiento descontrolado
-- conservar contexto inmediato
-- reducir ruido para el modelo
 
 ---
 
 ## 🧾 Historial visual
 
 `chatHistory` conserva la conversación para que, al refrescar o seleccionar un chat, el frontend pueda recargar mensajes anteriores.
-
-Ejemplo:
 
 ```json
 [
@@ -170,13 +125,11 @@ Ejemplo:
 ]
 ```
 
+LocalAI recibe los últimos 6 mensajes del historial (`.slice(-7, -1)`).
+
 ---
 
 ## 🏷️ Renombrado automático
-
-Cuando se crea un chat nuevo desde la pantalla inicial, Tempest usa la primera consulta del usuario para generar un título corto.
-
-Flujo:
 
 1. Se crea chat temporal con ID tipo `chat-123`.
 2. Se envía la primera consulta.
@@ -194,34 +147,3 @@ Flujo:
 - Se debe mejorar validación de nombres para evitar caracteres inválidos.
 - Se debe evitar sobrescribir chats/proyectos con nombres repetidos.
 - Se puede añadir resumen automático por chat y por proyecto.
-
----
-
-## 🏷️ Renombrado automático en herramientas
-
-Tempest también puede renombrar chats creados desde herramientas.
-
-### Transcripción
-
-Cuando el usuario inicia una transcripción en un chat nuevo:
-
-1. Se crea el chat temporal.
-2. Se procesa el audio.
-3. Se genera el documento.
-4. Se construye un prompt de título con:
-   - nombre del archivo
-   - formato
-   - modo de transcripción
-5. Se llama a `/title/generate`.
-6. El chat se renombra automáticamente.
-
-Prompt interno usado para título:
-
-```text
-Transcripción de audio
-Archivo: audio.m4a
-Formato: PDF
-Modo: Texto corrido
-```
-
-Esto evita que las transcripciones queden como `chat-123` o `Nueva conversación`.

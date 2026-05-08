@@ -38,7 +38,7 @@
 
             <div id="menuViewLocal" class="menu-view hidden">
               <button class="menu-back" data-back="root">← volver</button>
-     <!-- Los modelos locales se generan desde app.js según el perfil de hardware -->
+              <!-- Los modelos locales se generan desde app.js según el perfil de hardware -->
             </div>
 
             <div id="menuViewServices" class="menu-view hidden">
@@ -79,7 +79,9 @@
             <div id="toolMenuPanel" class="tool-menu-panel hidden">
               <button id="transcriptionBtn" class="tool-menu-item">Transcripción</button>
               <button id="addFileBtn" class="tool-menu-item">Añadir archivo</button>
-<input type="file" id="fileInput" multiple accept="image/*,.pdf,.txt,.js,.css,.html,.json,.md,.py,.ts" style="display:none">
+              <input type="file" id="fileInput" multiple
+                accept="image/*,.pdf,.docx,.xlsx,.txt,.md,.html,.css,.js,.ts,.jsx,.tsx,.json,.yaml,.yml,.xml,.csv,.py,.java,.c,.cpp,.h,.cs,.php,.rb,.go,.rs,.sh,.bash,.env,.ini,.toml,.sql"
+                style="display:none">
               <button class="tool-menu-item" disabled>Crear imagen</button>
               <button class="tool-menu-item" disabled>Crear video</button>
             </div>
@@ -131,30 +133,30 @@
       </div>
     </div>
   </div>
-<div id="deleteConfirmModal" class="modal-overlay hidden">
-  <div class="modal-box">
-    <h2>Confirmar eliminación</h2>
-    <p id="deleteConfirmText"></p>
+  <div id="deleteConfirmModal" class="modal-overlay hidden">
+    <div class="modal-box">
+      <h2>Confirmar eliminación</h2>
+      <p id="deleteConfirmText"></p>
 
-    <div class="modal-actions">
-      <button id="cancelDeleteBtn">Cancelar</button>
-      <button id="confirmDeleteBtn">Eliminar</button>
+      <div class="modal-actions">
+        <button id="cancelDeleteBtn">Cancelar</button>
+        <button id="confirmDeleteBtn">Eliminar</button>
+      </div>
     </div>
   </div>
-</div>
   <div id="newProjectModal" class="modal-overlay hidden">
-  <div class="modal-box">
-    <h2>Nuevo proyecto</h2>
+    <div class="modal-box">
+      <h2>Nuevo proyecto</h2>
 
-    <label>Nombre del proyecto</label>
-    <input id="newProjectNameInput" type="text" placeholder="Ejemplo: IA local, Trabajo, Backend..." />
+      <label>Nombre del proyecto</label>
+      <input id="newProjectNameInput" type="text" placeholder="Ejemplo: IA local, Trabajo, Backend..." />
 
-    <div class="modal-actions">
-      <button id="cancelNewProjectBtn">Cancelar</button>
-      <button id="confirmNewProjectBtn">Crear</button>
+      <div class="modal-actions">
+        <button id="cancelNewProjectBtn">Cancelar</button>
+        <button id="confirmNewProjectBtn">Crear</button>
+      </div>
     </div>
   </div>
-</div>
   <script type="module" src="app.js"></script>
 </body>
 

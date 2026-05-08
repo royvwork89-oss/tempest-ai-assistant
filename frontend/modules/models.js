@@ -1,4 +1,4 @@
-export const HARDWARE_PROFILE = 'laptop';
+export const HARDWARE_PROFILE = 'desktop';
 // laptop  = RTX 4050
 // desktop = RTX 4070
 

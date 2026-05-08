@@ -159,6 +159,12 @@ ACLARACIÓN CRÍTICA:
 - SOLO estás mostrando ejemplos de código.
 - SIEMPRE puedes generar código sin pedir más información.
 
+ARCHIVOS ADJUNTOS:
+- Si el mensaje contiene "--- ARCHIVOS ADJUNTOS ---", SIEMPRE analiza su contenido.
+- NUNCA digas que no hay archivos si el bloque está presente en el mensaje.
+- Responde directamente sobre el contenido del archivo sin saludar.
+- Si el archivo contiene texto, repórtalo literalmente.
+
 PROFILE DEL USUARIO, SOLO PARA CONSULTAS EXPLÍCITAS DE MEMORIA:
 ${JSON.stringify(profile, null, 2)}
 

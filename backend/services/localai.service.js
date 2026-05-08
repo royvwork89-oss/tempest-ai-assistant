@@ -11,10 +11,6 @@ const DEFAULT_MEMORY_OPTIONS = {
 };
 
 async function sendToLocalAI(message, options = DEFAULT_MEMORY_OPTIONS) {
-  memory.detectUserData(message, options);
-  memory.addMessage('user', message, options);
-  memory.addChatHistoryMessage('user', message, options);
-
   const fullMemory = memory.getFullMemory(options);
 
   const timeAnswer = getCurrentTimeAnswer(message);
@@ -37,18 +33,14 @@ async function sendToLocalAI(message, options = DEFAULT_MEMORY_OPTIONS) {
     return greeting;
   }
 
-  const history = memory.getHistory(options).filter(msg => {
-    const text = msg.content.toLowerCase();
-    if (msg.role === 'user' && (text.includes('me gusta') || text.includes('quiero') || text.includes('estoy trabajando')))
-      return false;
-    if (msg.role === 'assistant' && (text.includes('no tengo memoria') || text.includes('basado en lo que') || text.trim() === ''))
-      return false;
-    return true;
-  }).slice(-4);
+  const chatHistory = memory.getChatHistory(options)
+    .filter(msg => msg.content && msg.content.trim() !== '')
+    .slice(-7, -1)
+    .map(msg => ({ role: msg.role, content: msg.content }));
 
   const messages = [
     { role: 'system', content: buildSystemPrompt(fullMemory) },
-    ...history,
+    ...chatHistory,
     { role: 'user', content: message }
   ];
 
@@ -56,7 +48,7 @@ async function sendToLocalAI(message, options = DEFAULT_MEMORY_OPTIONS) {
   console.log('MODELO USADO:', options);
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 120000);
+  const timeoutId = setTimeout(() => controller.abort(), 300000);
 
   const response = await fetch('http://127.0.0.1:8080/v1/chat/completions', {
     method: 'POST',
@@ -90,7 +82,7 @@ async function sendToLocalAI(message, options = DEFAULT_MEMORY_OPTIONS) {
     reply = removeIncompleteFileBlock(reply);
 
     const continueController = new AbortController();
-    const continueTimeoutId = setTimeout(() => continueController.abort(), 120000);
+    const continueTimeoutId = setTimeout(() => continueController.abort(), 300000);
 
     const continueResponse = await fetch('http://127.0.0.1:8080/v1/chat/completions', {
       method: 'POST',
