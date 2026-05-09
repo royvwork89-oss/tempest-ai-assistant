@@ -134,9 +134,11 @@ LocalAI recibe los últimos 6 mensajes del historial (`.slice(-7, -1)`).
 1. Se crea chat temporal con ID tipo `chat-123`.
 2. Se envía la primera consulta.
 3. Backend llama a `/title/generate`.
-4. LocalAI genera un título corto.
-5. El archivo del chat se renombra.
-6. El sidebar muestra el nuevo nombre.
+4. El generador de títulos limpia el bloque de adjuntos del texto antes de enviarlo al modelo.
+5. Si el mensaje estaba vacío pero había archivos adjuntos, usa los nombres de los archivos como texto base.
+6. LocalAI genera un título corto (max_tokens: 12).
+7. El archivo del chat se renombra.
+8. El sidebar muestra el nuevo nombre.
 
 ---
 
@@ -144,6 +146,6 @@ LocalAI recibe los últimos 6 mensajes del historial (`.slice(-7, -1)`).
 
 - JSON es suficiente para MVP y depuración.
 - En producción conviene migrar a base de datos.
-- Se debe mejorar validación de nombres para evitar caracteres inválidos.
 - Se debe evitar sobrescribir chats/proyectos con nombres repetidos.
 - Se puede añadir resumen automático por chat y por proyecto.
+- Pendiente: ordenar chats por fecha de último mensaje en lugar de alfabéticamente.

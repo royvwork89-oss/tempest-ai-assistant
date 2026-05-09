@@ -6,11 +6,12 @@
 2. Frontend valida que no esté vacío.
 3. Si no hay chat activo, se crea uno en el contexto correcto.
 4. Frontend envía `POST /chat`.
-5. Backend recibe mensaje y memoria activa.
-6. Backend envía contexto a LocalAI.
-7. LocalAI genera respuesta.
-8. Backend guarda mensaje y respuesta.
-9. Frontend renderiza respuesta.
+5. Backend detecta si el mensaje es una solicitud de explicación.
+6. Backend recibe mensaje y memoria activa.
+7. Backend envía contexto a LocalAI.
+8. LocalAI genera respuesta.
+9. Backend guarda mensaje y respuesta.
+10. Frontend renderiza respuesta (separando archivos en bloques individuales si aplica).
 
 ---
 
@@ -46,12 +47,12 @@
 1. Usuario presiona `+ Nuevo Chat`.
 2. Se muestra pantalla inicial.
 3. No se crea chat todavía.
-4. Usuario escribe primer mensaje.
+4. Usuario escribe primer mensaje (o adjunta archivos sin texto).
 5. Se crea chat dentro de `general`.
 6. Se envía el mensaje.
-7. La IA genera un título corto.
+7. La IA genera un título corto basado en el mensaje o en los nombres de archivos adjuntos.
 8. El chat se renombra automáticamente.
-9. El sidebar se actualiza.
+9. El sidebar muestra el nuevo nombre.
 
 ---
 
@@ -59,13 +60,14 @@
 
 1. Usuario presiona `+ Nuevo Proyecto`.
 2. Se abre modal para escribir nombre.
-3. Usuario confirma.
-4. Se crea carpeta del proyecto.
-5. Se muestra pantalla inicial.
-6. Usuario escribe el primer mensaje.
-7. Se crea un chat dentro del proyecto.
-8. La IA genera el nombre del chat.
-9. El sidebar muestra proyecto y chat.
+3. Se valida el nombre (caracteres inválidos, longitud).
+4. Usuario confirma.
+5. Se crea carpeta del proyecto.
+6. Se muestra pantalla inicial.
+7. Usuario escribe el primer mensaje.
+8. Se crea un chat dentro del proyecto.
+9. La IA genera el nombre del chat.
+10. El sidebar muestra proyecto y chat.
 
 ---
 
@@ -85,10 +87,13 @@
 
 1. Usuario abre menú de tres puntos.
 2. Selecciona `Renombrar`.
-3. Escribe nuevo nombre.
-4. Frontend llama a `/chat/rename` o `/project/rename`.
-5. Backend renombra archivo o carpeta.
-6. Sidebar se actualiza.
+3. Se abre modal propio con el nombre actual pre-cargado.
+4. Usuario escribe nuevo nombre.
+5. Se valida el nombre (caracteres inválidos, longitud mínima/máxima).
+6. Si hay error, se muestra en rojo sin cerrar el modal.
+7. Si es válido, Frontend llama a `/chat/rename` o `/project/rename`.
+8. Backend renombra archivo o carpeta.
+9. Sidebar se actualiza.
 
 ---
 
@@ -135,6 +140,16 @@
 
 ---
 
+## 🧠 Flujo de detección de intención
+
+1. `chat.controller.js` recibe el mensaje del usuario.
+2. `isExplanationRequest()` normaliza el texto y busca palabras clave: "explícame", "qué es", "cómo funciona", "cuéntame", etc.
+3. Si detecta solicitud de explicación y no hay archivos adjuntos → prefija el mensaje con `"Responde SOLO con texto explicativo, sin código."`.
+4. Si no detecta explicación → envía el mensaje sin modificar.
+5. El model responde acorde a la instrucción recibida.
+
+---
+
 ## ⚠️ Manejo de errores
 
 - Mensaje vacío.
@@ -142,6 +157,7 @@
 - Error de LocalAI.
 - Error de archivo no seleccionado.
 - Error en transcripción.
-- Nombre de chat/proyecto repetido.
+- Nombre de chat/proyecto con caracteres inválidos (mostrado inline en modal).
+- Nombre demasiado corto o largo.
 - Archivo con mimetype o extensión no permitida.
 - Error de extracción de texto (PDF corrupto, DOCX dañado, etc.).

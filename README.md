@@ -13,6 +13,7 @@ Tempest es un asistente local de IA construido con Node.js, Express, LocalAI y f
 - Chats independientes.
 - Chats agrupados por proyecto.
 - Historial persistente por chat.
+- Detección de intención: responde con texto para explicaciones, con código para implementaciones.
 
 ### 📎 Archivos adjuntos
 
@@ -24,12 +25,8 @@ Tempest es un asistente local de IA construido con Node.js, Express, LocalAI y f
   - **Texto/código**: TXT, MD, HTML, CSS, JS, TS, JSX, TSX, JSON, YAML, XML, CSV, PY, JAVA, C, CPP, H, CS, PHP, RB, GO, RS, SH, BASH, ENV, INI, TOML, SQL
   - **Documentos**: PDF (pdf2json), DOCX (mammoth), XLSX (xlsx)
   - **Imágenes**: PNG, JPG, GIF, WEBP (placeholder con metadata)
-- Truncado inteligente diferenciado:
-  - Código: 60% cabecera + 30% final con aviso de truncado
-  - Documentos: 65% inicio + 25% final con aviso de truncado
-- Limpieza automática de temporales en doble capa:
-  - Capa A: inmediata en `finally` tras cada petición
-  - Capa B: job escoba cada 6h borra archivos con más de 24h
+- Truncado inteligente diferenciado por tipo.
+- Limpieza automática de temporales en doble capa.
 
 ### 🧠 Sistema de memoria
 
@@ -40,8 +37,6 @@ Tempest es un asistente local de IA construido con Node.js, Express, LocalAI y f
 - Persistencia en archivos JSON.
 
 ### 📁 Organización por proyectos
-
-Tempest permite organizar conversaciones en:
 
 ```text
 + Nuevo Chat
@@ -55,19 +50,28 @@ proyecto
 ### 🏷️ Renombrado inteligente
 
 - La primera consulta genera automáticamente el nombre del chat usando IA.
+- Generador de títulos optimizado: más rápido, limpia bloque de adjuntos, maneja mensajes solo con archivos.
 - Los proyectos se nombran manualmente al crearlos.
-- Cada chat/proyecto puede renombrarse desde el menú lateral.
+- Cada chat/proyecto puede renombrarse desde un modal visual propio.
+- Validación de nombres: sin caracteres inválidos, mínimo 2 caracteres, máximo 60.
 
 ### 🗑️ Eliminación segura
 
 - Menú de tres puntos con opciones Renombrar / Eliminar.
 - Modal de confirmación propio.
+- Modo selección para eliminar múltiples chats independientes.
 
 ### 🎙️ Transcripción de audio
 
 - Procesamiento con ffmpeg + Whisper vía LocalAI.
 - División automática en fragmentos.
 - Exportación a TXT, PDF y DOCX.
+
+### 🖥️ Renderizado de código
+
+- Bloques de código estilo terminal con etiqueta de lenguaje y botón de copiar.
+- Separación automática de múltiples archivos en bloques individuales.
+- Detección de formatos: triple backtick y patrones `Archivo: nombre.ext` en texto plano.
 
 ---
 
@@ -94,7 +98,7 @@ backend/
 │   ├── chat.routes.js
 │   └── transcription.routes.js
 ├── services/
-│   ├── attachment.service.js       ← extracción de texto de adjuntos
+│   ├── attachment.service.js
 │   ├── localai.service.js
 │   ├── localai/
 │   │   ├── memory.answers.js
@@ -103,7 +107,7 @@ backend/
 │   ├── memory.service.js
 │   └── transcription.service.js
 ├── uploads/
-│   ├── attachments/                ← archivos temporales de adjuntos
+│   ├── attachments/
 │   ├── audio/
 │   └── chunks/
 ├── utils/
@@ -168,7 +172,8 @@ npm install
 ### 2. Ejecutar LocalAI
 
 ```text
-http://localhost:8080
+cd docker
+docker-compose up
 ```
 
 ### 3. Ejecutar backend
@@ -197,16 +202,21 @@ http://localhost:3005
 
 ## 🧠 Estado del proyecto
 
-Versión actual: **v0.4.1**
+Versión actual: **v0.4.2**
 
 Tempest cuenta con:
 
 - Chat local funcional con memoria por usuario/proyecto/chat
 - Sidebar con proyectos y chats
-- Renombrar/eliminar chats y proyectos
-- Generación automática de títulos de chat
+- **Modal propio para renombrar** (reemplazó `prompt()` nativo)
+- **Validación de nombres** para caracteres inválidos
+- Eliminar chats y proyectos con modal de confirmación
+- Generación automática de títulos de chat (optimizado)
+- **Renombrado de chat cuando el primer mensaje es solo archivo adjunto**
 - Transcripción de audio con exportación TXT/PDF/DOCX
 - Renderizado de bloques de código estilo terminal
+- **Separación automática de múltiples archivos en bloques individuales**
+- **Detección de intención** — texto para explicaciones, código para implementaciones
 - Botón para copiar código dentro de bloques
 - Input multilínea con `Shift + Enter`
 - Textarea autoexpandible con límite de altura
@@ -217,30 +227,6 @@ Tempest cuenta con:
 - **Historial de conversación corregido** (sin duplicados)
 
 *preparado para futuro
-
----
-
-## 🔮 Próximos pasos
-
-**Para v1.0:**
-- Modal propio para renombrar (reemplazar `prompt()` nativo)
-- Validación de nombres para caracteres inválidos
-- Manejo de errores visual
-
-**Integración de modelos:**
-- Configurar Qwen2.5-Coder-14B para trabajo de código rutinario
-- Integrar Claude API y OpenAI API para problemas complejos
-- Modo híbrido: LocalAI para trabajo del día a día, API externa cuando el modelo local no alcanza
-
-**Post v1.0:**
-- Función de voz al chat (hablar → texto → consulta)
-- Stream de audio en vivo con Faster-Whisper
-- Implementar lectura de PPTX
-- LibreOffice headless para mejor extracción de documentos
-- Añadir resumen automático por chat/proyecto
-- Migrar persistencia a base de datos
-- Añadir login real
-- Convertir en app desktop con Electron
 
 ---
 

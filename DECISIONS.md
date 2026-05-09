@@ -10,10 +10,10 @@ Este documento registra las decisiones técnicas principales tomadas durante el 
 Usar LocalAI como motor principal de inferencia.
 
 ### Razón
-- Independencia de servicios externos, privacidad, ejecución local, sin costo por token, control sobre modelos GGUF.
+Independencia de servicios externos, privacidad, ejecución local, sin costo por token, control sobre modelos GGUF.
 
 ### Impacto
-- Más control, mayor complejidad técnica, menor potencia que modelos comerciales grandes.
+Más control, mayor complejidad técnica, menor potencia que modelos comerciales grandes.
 
 ---
 
@@ -23,10 +23,10 @@ Usar LocalAI como motor principal de inferencia.
 Construir el backend con Node.js y Express.
 
 ### Razón
-- Simple de depurar, alineado con JavaScript del frontend, buena base para APIs REST, modularización clara.
+Simple de depurar, alineado con JavaScript del frontend, buena base para APIs REST, modularización clara.
 
 ### Impacto
-- Desarrollo rápido, fácil expansión, buen proyecto de portafolio backend.
+Desarrollo rápido, fácil expansión, buen proyecto de portafolio backend.
 
 ---
 
@@ -36,7 +36,7 @@ Construir el backend con Node.js y Express.
 Separar el backend en routes / controllers / services / utils / config.
 
 ### Impacto
-- Código más profesional, cambios localizados, base preparada para crecer.
+Código más profesional, cambios localizados, base preparada para crecer.
 
 ---
 
@@ -46,10 +46,10 @@ Separar el backend en routes / controllers / services / utils / config.
 Separar memoria en tres niveles: Usuario → Proyecto → Chat.
 
 ### Razón
-- Evitar mezclar conversaciones, permitir proyectos con múltiples chats, aislar historiales individuales.
+Evitar mezclar conversaciones, permitir proyectos con múltiples chats, aislar historiales individuales.
 
 ### Impacto
-- Mejor organización, experiencia parecida a ChatGPT, base para multiusuario real.
+Mejor organización, experiencia parecida a ChatGPT, base para multiusuario real.
 
 ---
 
@@ -59,10 +59,10 @@ Separar memoria en tres niveles: Usuario → Proyecto → Chat.
 Guardar memoria, proyectos y chats en archivos JSON.
 
 ### Razón
-- Fácil de inspeccionar, rápido de implementar, ideal para MVP local.
+Fácil de inspeccionar, rápido de implementar, ideal para MVP local.
 
 ### Impacto
-- Depuración sencilla, futura migración necesaria a DB si crece.
+Depuración sencilla, futura migración necesaria a DB si crece.
 
 ---
 
@@ -72,7 +72,7 @@ Guardar memoria, proyectos y chats en archivos JSON.
 Permitir dos tipos de conversación: chats sin proyecto en `general` y chats ligados a proyectos.
 
 ### Impacto
-- Mejor UX, mejor organización, más lógica en frontend y memoria.
+Mejor UX, mejor organización, más lógica en frontend y memoria.
 
 ---
 
@@ -82,7 +82,50 @@ Permitir dos tipos de conversación: chats sin proyecto en `general` y chats lig
 Usar la primera consulta para generar título automático del chat.
 
 ### Impacto
-- Sidebar más útil, requiere endpoint `/title/generate`, depende de LocalAI.
+Sidebar más útil, requiere endpoint `/title/generate`, depende de LocalAI.
+
+---
+
+## 🏷️ Generador de títulos optimizado
+
+### Decisión
+- Limpiar el bloque `--- ARCHIVOS ADJUNTOS ---` antes de enviarlo al modelo generador.
+- Usar `max_tokens: 12` en lugar de 20.
+- System prompt directo sin redundancia con el mensaje de usuario.
+- Truncar texto a 300 caracteres.
+- Si el mensaje está vacío pero hay archivos adjuntos, usar los nombres de los archivos como texto base.
+
+### Razón
+El bloque de adjuntos confundía al modelo. Reducir tokens fuerza títulos más cortos y precisos.
+
+### Impacto
+Títulos más relevantes y generación más rápida.
+
+---
+
+## 🧾 Modal propio para renombrar
+
+### Decisión
+Reemplazar `prompt()` nativo del navegador por un modal visual propio.
+
+### Razón
+El `prompt()` nativo es inconsistente entre navegadores, no se puede estilizar y rompe la experiencia visual.
+
+### Impacto
+UX más profesional y consistente. El modal soporta validación inline con mensaje de error en rojo.
+
+---
+
+## ✅ Validación de nombres
+
+### Decisión
+Validar nombres de chats y proyectos con estas reglas: no vacío, mínimo 2 caracteres, sin caracteres inválidos (`\ / : * ? " < > |`), no empieza con punto, máximo 60 caracteres.
+
+### Razón
+Evitar errores del sistema de archivos al crear carpetas y archivos JSON con nombres inválidos.
+
+### Impacto
+Mayor robustez. Los errores se muestran inline sin cerrar el modal.
 
 ---
 
@@ -92,7 +135,7 @@ Usar la primera consulta para generar título automático del chat.
 Usar un modal interno en lugar de `confirm()` del navegador.
 
 ### Impacto
-- Interfaz más profesional, más código frontend.
+Interfaz más profesional, más código frontend.
 
 ---
 
@@ -102,7 +145,7 @@ Usar un modal interno en lugar de `confirm()` del navegador.
 Implementar transcripción con ffmpeg + LocalAI Whisper.
 
 ### Impacto
-- Mayor privacidad, mayor carga técnica, requiere limpieza de temporales.
+Mayor privacidad, mayor carga técnica, requiere limpieza de temporales.
 
 ---
 
@@ -112,43 +155,28 @@ Implementar transcripción con ffmpeg + LocalAI Whisper.
 Extraer texto de los archivos adjuntos en el backend e inyectarlo al prompt como contexto plano, en lugar de enviar el archivo directamente a LocalAI.
 
 ### Razón
-- LocalAI solo recibe texto. No puede procesar archivos binarios directamente.
-- Mantiene la arquitectura simple: el modelo solo ve texto bien estructurado.
-- Permite truncado inteligente antes de enviar al modelo.
+LocalAI solo recibe texto. No puede procesar archivos binarios directamente.
 
 ### Impacto
-- LocalAI puede "leer" documentos sin soporte nativo de archivos.
-- Diferencia entre calidad de extracción según tipo de archivo.
-- Requiere librerías específicas por formato.
+LocalAI puede "leer" documentos sin soporte nativo de archivos. Diferencia entre calidad de extracción según tipo de archivo.
 
 ---
 
 ## 📎 Librerías de extracción por tipo de archivo
 
 ### Decisión
-- **PDF**: `pdf2json` — descartados `pdf-parse` (bug de exports en versiones recientes) y `pdfjs-dist` (ruta `/legacy/build/pdf.js` eliminada en v5.x).
+- **PDF**: `pdf2json` — descartados `pdf-parse` y `pdfjs-dist` por bugs.
 - **DOCX**: `mammoth` — extracción limpia de texto plano.
-- **XLSX**: `xlsx` — conversión por hoja a CSV, cada hoja etiquetada.
-- **Imágenes**: placeholder con metadata (nombre, tamaño, tipo). LocalAI no analiza imágenes visualmente.
-
-### Razón
-- `pdf-parse` falla con `Package subpath './lib/pdf-parse.js' is not defined by exports`.
-- `pdfjs-dist` v5.x eliminó la ruta legacy usada en Node.js.
-- `pdf2json` funciona nativamente sin problemas de exports.
+- **XLSX**: `xlsx` — conversión por hoja a CSV etiquetado.
+- **Imágenes**: placeholder con metadata.
 
 ---
 
 ## 📎 Truncado inteligente diferenciado
 
 ### Decisión
-Truncar de forma diferente según el tipo de archivo:
-- **Código**: 60% cabecera (imports/firmas) + 30% final (donde suelen estar los bugs).
-- **Documentos**: 65% inicio + 25% final.
-- Límite: 7500 caracteres.
-
-### Razón
-- Evitar enviar contexto infinito al modelo.
-- Preservar las partes más útiles según el tipo de contenido.
+- **Código**: 60% cabecera + 30% final, límite 7500 chars.
+- **Documentos**: 65% inicio + 25% final, límite 7500 chars.
 
 ---
 
@@ -156,11 +184,7 @@ Truncar de forma diferente según el tipo de archivo:
 
 ### Decisión
 - **Capa A**: limpieza inmediata en bloque `finally` tras cada request.
-- **Capa B**: job escoba con `setInterval` cada 6h que borra archivos con más de 24h en `uploads/attachments/`.
-
-### Razón
-- La Capa A puede fallar si el proceso se interrumpe.
-- La Capa B actúa como red de seguridad.
+- **Capa B**: job escoba con `setInterval` cada 6h.
 
 ---
 
@@ -171,8 +195,7 @@ Truncar de forma diferente según el tipo de archivo:
 - `workingMemory` guarda el contexto extraído por separado.
 
 ### Razón
-- Permite que preguntas de seguimiento ("¿puedes resumir la sección 3?") tengan acceso al contenido del archivo.
-- Evitar duplicar el bloque en memoria de trabajo.
+Permite preguntas de seguimiento con acceso al contenido del archivo.
 
 ---
 
@@ -181,12 +204,36 @@ Truncar de forma diferente según el tipo de archivo:
 ### Decisión
 Soportar tres perfiles de calidad de modelo GGUF: Q4 (rápido), Q5 (equilibrado), Q6 (calidad).
 
-### Razón
-- Dar flexibilidad según recursos disponibles.
-
 ### Fix aplicado
 - El nombre de archivo en los YAML usaba guión en lugar de punto antes de Q5/Q6.
 - `n_gpu_layers` debe ir dentro de `parameters`, no como campo raíz.
+- `hermes-q5.yaml` tenía un carácter `ç` inválido en la línea `template:ç`.
+
+---
+
+## 🧠 Detección de intención en el backend
+
+### Decisión
+Detectar en `chat.controller.js` si el mensaje es una solicitud de explicación (palabras clave: "explícame", "qué es", "cómo funciona", etc.) y agregar un prefijo al mensaje antes de enviarlo al modelo.
+
+### Razón
+El system prompt con reglas de código agresivas hacía que el modelo respondiera con código incluso ante preguntas de explicación. Modificar el system prompt afectaba la entrega de múltiples archivos.
+
+### Impacto
+El modelo responde con texto cuando se le pide explicar y con código cuando se le pide implementar, sin sacrificar la capacidad de entregar múltiples archivos.
+
+---
+
+## 🖥️ Separación de múltiples archivos en el frontend
+
+### Decisión
+El `renderMixedContent` en `ui.js` detecta tanto bloques con triple backtick como patrones de texto plano `Archivo: nombre.ext` y `nombre.ext:` para separar archivos en bloques individuales de código.
+
+### Razón
+Los modelos locales no siempre usan backticks consistentemente. El frontend debe ser tolerante a distintos formatos de salida.
+
+### Impacto
+Cada archivo se muestra en su propio bloque estilo terminal con etiqueta de lenguaje y botón de copiar individual.
 
 ---
 
@@ -194,13 +241,13 @@ Soportar tres perfiles de calidad de modelo GGUF: Q4 (rápido), Q5 (equilibrado)
 
 - Implementar PPTX con extracción XML de ZIP.
 - Implementar LibreOffice headless desde Node para mejor calidad de extracción.
-- **Modo híbrido de modelos:**
-  - LocalAI con Qwen2.5-Coder-14B para código rutinario, refactorización simple y trabajo del día a día.
-  - Claude API / OpenAI API para arquitectura compleja, problemas difíciles o cuando el modelo local no alcanza.
-  - Selección manual desde el menú o automática según complejidad de la consulta.
+- **Modo híbrido de modelos:** LocalAI con Qwen2.5-Coder-14B para código rutinario, Claude API / OpenAI API para arquitectura compleja.
 - Migrar memoria JSON a base de datos.
 - Añadir login real.
 - Añadir resumen automático por chat/proyecto.
 - Añadir embeddings para búsqueda semántica.
 - Función de voz al chat: hablar → texto → consulta.
 - Stream de audio en vivo con Faster-Whisper.
+- Ordenar chats por fecha de último mensaje y mover al tope al recibir nuevo mensaje.
+- Reemplazar botones de copiar por íconos estilo ChatGPT/Claude.
+- Mostrar opciones de acción al seleccionar texto manualmente.
