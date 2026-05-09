@@ -24,6 +24,7 @@ import {
   refreshLocalActiveState,
   updateMenuTriggerLabel
 } from './modules/models.js';
+
 import {
   loadSidebar,
   loadChats,
@@ -32,7 +33,8 @@ import {
   setPendingBulkDelete,
   getPendingDelete,
   getPendingBulkDelete,
-  clearSelection
+  clearSelection,
+  openRenameModal
 } from './modules/sidebar.js';
 
 import { initAttachments, getAttachedFiles, clearAttachedFiles } from './modules/attachments.js';
@@ -325,9 +327,36 @@ document.getElementById('newProjectBtn').onclick = () => {
 
 cancelNewProjectBtn.onclick = () => newProjectModal.classList.add('hidden');
 
+newProjectNameInput.addEventListener('input', () => {
+  newProjectNameInput.setCustomValidity('');
+});
+
 confirmNewProjectBtn.onclick = async () => {
   const projectName = newProjectNameInput.value.trim();
-  if (!projectName) { alert('Escribe un nombre para el proyecto'); return; }
+
+  // Validación inline (mismas reglas que sidebar)
+  const invalidChars = /[\\/:*?"<>|]/;
+  if (!projectName) {
+    newProjectNameInput.setCustomValidity('El nombre no puede estar vacío.');
+    newProjectNameInput.reportValidity();
+    return;
+  }
+  if (projectName.length < 2) {
+    newProjectNameInput.setCustomValidity('Mínimo 2 caracteres.');
+    newProjectNameInput.reportValidity();
+    return;
+  }
+  if (invalidChars.test(projectName)) {
+    newProjectNameInput.setCustomValidity('Caracteres no permitidos: \\ / : * ? " < > |');
+    newProjectNameInput.reportValidity();
+    return;
+  }
+  if (projectName.length > 60) {
+    newProjectNameInput.setCustomValidity('Máximo 60 caracteres.');
+    newProjectNameInput.reportValidity();
+    return;
+  }
+  newProjectNameInput.setCustomValidity('');
 
   const { createProject } = await import('./api.js');
   await createProject(projectName);
@@ -448,63 +477,65 @@ async function sendMessage() {
   };
 
   const visibleMessage = files.length > 0
-  ? `${message || 'Analiza los archivos adjuntos.'}\n\n📎 Archivos adjuntos: ${files.map(file => file.name).join(', ')}`
-  : message;
+    ? `${message || 'Analiza los archivos adjuntos.'}\n\n📎 Archivos adjuntos: ${files.map(file => file.name).join(', ')}`
+    : message;
 
-addMessage(chatBox, 'Tú', visibleMessage);
+  addMessage(chatBox, 'Tú', visibleMessage);
 
-userInput.value = '';
-autoResizeUserInput();
+  userInput.value = '';
+  autoResizeUserInput();
 
-const documentRequest = detectDocumentRequest(message);
+  const documentRequest = detectDocumentRequest(message);
 
-typing.textContent = documentRequest
-  ? `Generando documento ${documentRequest.format.toUpperCase()}...`
-  : 'Tempest está pensando...';
+  typing.textContent = documentRequest
+    ? `Generando documento ${documentRequest.format.toUpperCase()}...`
+    : 'Tempest está pensando...';
 
-sendBtn.disabled = true;
-userInput.disabled = true;
+  sendBtn.disabled = true;
+  userInput.disabled = true;
 
-try {
-  if (documentRequest && files.length === 0) {
-    const data = await generateDocument(message, documentRequest.format, config);
+  try {
+    if (documentRequest && files.length === 0) {
+      const data = await generateDocument(message, documentRequest.format, config);
 
-    if (data.ok && data.document) {
-      addDocumentCard(chatBox, data.document);
+      if (data.ok && data.document) {
+        addDocumentCard(chatBox, data.document);
 
-      if (pendingAutoRename) {
-        const renameTarget = { ...pendingAutoRename };
-        const titleData = await generateTitle(message, renameTarget.type);
+        if (pendingAutoRename) {
+          const renameTarget = { ...pendingAutoRename };
+          const titleText = message.trim()
+            || (files.length > 0 ? files.map(f => f.name).join(', ') : '');
+          const titleData = await generateTitle(titleText, renameTarget.type);
 
-        if (titleData.ok && titleData.title) {
-          const chatsData = await listChats(renameTarget.projectId);
-          const existingChats = Array.isArray(chatsData.chats)
-            ? chatsData.chats.filter(c => c !== renameTarget.chatId)
-            : [];
+          if (titleData.ok && titleData.title) {
+            const chatsData = await listChats(renameTarget.projectId);
+            const existingChats = Array.isArray(chatsData.chats)
+              ? chatsData.chats.filter(c => c !== renameTarget.chatId)
+              : [];
 
-          const uniqueTitle = makeUniqueChatTitle(titleData.title, existingChats);
+            const uniqueTitle = makeUniqueChatTitle(titleData.title, existingChats);
 
-          await renameChat(renameTarget.chatId, uniqueTitle, renameTarget.projectId);
+            await renameChat(renameTarget.chatId, uniqueTitle, renameTarget.projectId);
 
-          setActiveChat({
-            projectId: renameTarget.projectId,
-            chatId: uniqueTitle,
-            mode: renameTarget.projectId === 'general' ? 'chat' : 'project'
-          });
+            setActiveChat({
+              projectId: renameTarget.projectId,
+              chatId: uniqueTitle,
+              mode: renameTarget.projectId === 'general' ? 'chat' : 'project'
+            });
 
-          pendingAutoRename = null;
-          await loadSidebar(sidebarDeps);
+            pendingAutoRename = null;
+            await loadSidebar(sidebarDeps);
+          }
         }
+
+        return;
       }
 
+      addMessage(chatBox, 'Tempest', 'No pude generar el documento: ' + (data.error || 'Error desconocido'));
       return;
     }
 
-    addMessage(chatBox, 'Tempest', 'No pude generar el documento: ' + (data.error || 'Error desconocido'));
-    return;
-  }
-
-  const data = await sendChatMessage(message || 'Analiza los archivos adjuntos.', config, files);
+    const data = await sendChatMessage(message || 'Analiza los archivos adjuntos.', config, files);
 
     if (files.length > 0) {
       clearAttachedFiles();
@@ -514,11 +545,13 @@ try {
 
     if (data.ok) {
       addMessage(chatBox, 'Tempest', data.reply);
-      
+
 
       if (pendingAutoRename) {
         const renameTarget = { ...pendingAutoRename };
-        const titleData = await generateTitle(message, renameTarget.type);
+        const titleText = message.trim()
+          || (files.length > 0 ? files.map(f => f.name).join(', ') : '');
+        const titleData = await generateTitle(titleText, renameTarget.type);
 
         if (titleData.ok && titleData.title) {
           const chatsData = await listChats(renameTarget.projectId);

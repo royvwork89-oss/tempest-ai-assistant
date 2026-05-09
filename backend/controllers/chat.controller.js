@@ -8,10 +8,21 @@ const {
 
 function buildMemoryOptions(req) {
   return {
-    userId:    req.body?.userId    || req.query?.userId    || memory.DEFAULT_USER_ID,
+    userId: req.body?.userId || req.query?.userId || memory.DEFAULT_USER_ID,
     projectId: req.body?.projectId || req.query?.projectId || memory.DEFAULT_PROJECT_ID,
-    chatId:    req.body?.chatId    || req.query?.chatId    || memory.DEFAULT_CHAT_ID
+    chatId: req.body?.chatId || req.query?.chatId || memory.DEFAULT_CHAT_ID
   };
+}
+
+function isExplanationRequest(message) {
+  const text = message.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const triggers = [
+    'explicame', 'explica', 'que es', 'que son', 'como funciona',
+    'como funcionan', 'cuentame', 'describeme', 'describe',
+    'en que consiste', 'para que sirve', 'para que sirven',
+    'que significa', 'defineme', 'define '
+  ];
+  return triggers.some(t => text.includes(t));
 }
 
 async function chat(req, res) {
@@ -29,13 +40,18 @@ async function chat(req, res) {
       try { config = JSON.parse(config); } catch { config = {}; }
     }
 
-    const userMessage     = rawMessage.trim() || 'Analiza los archivos adjuntos.';
-    const memoryOptions   = buildMemoryOptions(req);
+    const rawTrimmed = rawMessage.trim();
+    const userMessage = rawTrimmed
+      ? (isExplanationRequest(rawTrimmed) && files.length === 0
+        ? `Responde SOLO con texto explicativo, sin código. ${rawTrimmed}`
+        : rawTrimmed)
+      : 'Analiza los archivos adjuntos.';
+    const memoryOptions = buildMemoryOptions(req);
 
     memory.detectUserData(userMessage, memoryOptions);
 
     const attachmentContext = await buildAttachmentContext(files);
-    const attachmentNames   = getAttachmentNames(files);
+    const attachmentNames = getAttachmentNames(files);
 
     const finalMessage = attachmentContext
       ? `${userMessage}\n\n${attachmentContext}`
@@ -49,7 +65,7 @@ async function chat(req, res) {
 
     const reply = await sendToLocalAI(finalMessage, {
       ...memoryOptions,
-      primaryModel:    config.primaryModel    || 'hermes-q4',
+      primaryModel: config.primaryModel || 'hermes-q4',
       hardwareProfile: config.hardwareProfile || 'laptop'
     });
 

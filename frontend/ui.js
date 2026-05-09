@@ -86,29 +86,59 @@ function renderMixedContent(container, text) {
   let codeLines = [];
   let insideCode = false;
   let language = 'código';
+  let insideFileBlock = false;
+  let fileBlockName = '';
+  let fileBlockLines = [];
 
   function flushText() {
     const value = normalText.join('\n').trim();
-    if (value) {
-      container.appendChild(renderText(value));
-    }
+    if (value) container.appendChild(renderText(value));
     normalText = [];
   }
 
   function flushCode() {
     const value = codeLines.join('\n').trim();
-    if (value) {
+    if (!value) { codeLines = []; language = 'código'; return; }
+    const segments = value.split(/(?=^(?:Archivo:\s*.+|[\w./\\-]+\.(js|ts|jsx|tsx|py|json|yaml|yml|css|html|sh|env|sql|md):)$)/m);
+    if (segments.length > 1) {
+      segments.forEach(segment => {
+        const trimmed = segment.trim();
+        if (!trimmed) return;
+        const match = trimmed.match(/^Archivo:\s*(.+)\n([\s\S]*)$/);
+        if (match) {
+          const fileName = match[1].trim();
+          const code = match[2].trim();
+          const ext = fileName.split('.').pop().toLowerCase();
+          container.appendChild(renderCodeBlock(code, ext || fileName));
+        } else {
+          container.appendChild(renderCodeBlock(trimmed, language));
+        }
+      });
+    } else {
       container.appendChild(renderCodeBlock(value, language));
     }
     codeLines = [];
     language = 'código';
   }
 
+  function flushFileBlock() {
+    const value = fileBlockLines.join('\n').trim();
+    if (value) {
+      const ext = fileBlockName.split('.').pop().toLowerCase();
+      container.appendChild(renderCodeBlock(value, ext || fileBlockName));
+    }
+    fileBlockLines = [];
+    fileBlockName = '';
+    insideFileBlock = false;
+  }
+
   for (const line of lines) {
     const trimmed = line.trim();
 
+    // Detectar inicio de bloque con backticks
     if (trimmed.startsWith('```')) {
       if (!insideCode) {
+        if (insideFileBlock) flushFileBlock();
         flushText();
         insideCode = true;
         language = trimmed.replace(/```/g, '').trim() || 'código';
@@ -116,22 +146,34 @@ function renderMixedContent(container, text) {
         insideCode = false;
         flushCode();
       }
-
       continue;
     }
 
     if (insideCode) {
       codeLines.push(line);
+      continue;
+    }
+
+    // Detectar "Archivo: nombre.ext" en texto plano
+    const fileMatch = trimmed.match(/^Archivo:\s*(.+)$/);
+    if (fileMatch) {
+      flushText();
+      if (insideFileBlock) flushFileBlock();
+      insideFileBlock = true;
+      fileBlockName = fileMatch[1].trim();
+      continue;
+    }
+
+    if (insideFileBlock) {
+      fileBlockLines.push(line);
     } else {
       normalText.push(line);
     }
   }
 
+  if (insideCode) flushCode();
+  if (insideFileBlock) flushFileBlock();
   flushText();
-
-  if (insideCode) {
-    flushCode();
-  }
 }
 
 function renderText(text) {

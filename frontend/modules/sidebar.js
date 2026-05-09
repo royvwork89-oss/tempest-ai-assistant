@@ -11,6 +11,15 @@ import {
 import { setActiveChat, getChatState } from '../chatState.js';
 import { addMessage } from '../ui.js';
 
+function validateName(name) {
+  if (!name || !name.trim()) return 'El nombre no puede estar vacío.';
+  if (name.trim().length < 2) return 'El nombre debe tener al menos 2 caracteres.';
+  if (/[\\/:*?"<>|]/.test(name)) return 'El nombre contiene caracteres no permitidos: \\ / : * ? " < > |';
+  if (/^\./.test(name.trim())) return 'El nombre no puede empezar con un punto.';
+  if (name.trim().length > 60) return 'El nombre es demasiado largo (máximo 60 caracteres).';
+  return null; // null = válido
+}
+
 let collapsedProjects = new Set();
 let sidebarInitialized = false;
 let selectionMode = false;
@@ -50,13 +59,10 @@ export function createActionsMenu({ type, id, projectId }, { onLoadSidebar, onLo
   const deleteBtn = document.createElement('button');
   deleteBtn.textContent = 'Eliminar';
 
-  renameBtn.onclick = async (event) => {
+  renameBtn.onclick = (event) => {
     event.stopPropagation();
-    const newName = prompt('Nuevo nombre:', id);
-    if (!newName || newName === id) return;
-    if (type === 'chat') await renameChat(id, newName, projectId);
-    if (type === 'project') await renameProject(id, newName);
-    await onLoadSidebar();
+    menu.classList.add('hidden');
+    openRenameModal({ type, id, projectId, onLoadSidebar });
   };
 
   deleteBtn.onclick = (event) => {
@@ -268,6 +274,60 @@ export async function loadProjects(deps) {
       await loadProjectChats(projectId, projectChats, deps);
     }
   }
+}
+
+export function openRenameModal({ type, id, projectId, onLoadSidebar }) {
+  const modal = document.getElementById('renameModal');
+  const label = document.getElementById('renameModalLabel');
+  const input = document.getElementById('renameModalInput');
+  const cancelBtn = document.getElementById('cancelRenameBtn');
+  const confirmBtn = document.getElementById('confirmRenameBtn');
+
+  label.textContent = type === 'project' ? 'Nuevo nombre del proyecto' : 'Nuevo nombre del chat';
+  input.value = id;
+  modal.classList.remove('hidden');
+  input.focus();
+  input.select();
+
+  // Limpia listeners anteriores clonando los botones
+  const newCancel = cancelBtn.cloneNode(true);
+  const newConfirm = confirmBtn.cloneNode(true);
+  cancelBtn.replaceWith(newCancel);
+  confirmBtn.replaceWith(newConfirm);
+
+  const close = () => modal.classList.add('hidden');
+
+  newCancel.onclick = close;
+
+newConfirm.onclick = async () => {
+  const newName = input.value.trim();
+  if (!newName || newName === id) { close(); return; }
+
+  const error = validateName(newName);
+  if (error) {
+    const errorEl = modal.querySelector('.rename-modal-error') || (() => {
+      const el = document.createElement('p');
+      el.className = 'rename-modal-error';
+      input.insertAdjacentElement('afterend', el);
+      return el;
+    })();
+    errorEl.textContent = error;
+    return; // no cierra, deja al usuario corregir
+  }
+
+  const errorEl = modal.querySelector('.rename-modal-error');
+  if (errorEl) errorEl.remove();
+
+  if (type === 'chat') await renameChat(id, newName, projectId);
+  if (type === 'project') await renameProject(id, newName);
+  close();
+  await onLoadSidebar();
+};
+
+  input.onkeydown = async (e) => {
+    if (e.key === 'Enter') newConfirm.onclick();
+    if (e.key === 'Escape') close();
+  };
 }
 
 export async function loadSidebar(deps) {

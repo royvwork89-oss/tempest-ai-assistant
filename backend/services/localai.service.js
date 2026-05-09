@@ -147,19 +147,13 @@ function cleanGeneratedTitle(rawTitle, sourceText = '') {
 }
 
 async function generateTitleFromText(text, type = 'chat', model = 'hermes-q4') {
-  const normalizedText = String(text || '').trim();
+  // Recortar el bloque de adjuntos para no confundir al modelo
+  const cleanedText = String(text || '')
+    .replace(/---\s*ARCHIVOS ADJUNTOS\s*---[\s\S]*/i, '')
+    .trim()
+    .slice(0, 300); // suficiente contexto, sin desperdiciar tokens
 
-  const prompt = `
-Eres un generador de nombres para chats.
-Responde SOLO con un título en español.
-Máximo 5 palabras. Sin comillas. Sin signos raros. Sin explicación.
-Si el mensaje es muy genérico, responde: Nueva conversación
-
-Mensaje:
-${normalizedText}
-
-Título:
-`.trim();
+  if (!cleanedText) return 'Nueva conversación';
 
   try {
     const response = await fetch('http://127.0.0.1:8080/v1/chat/completions', {
@@ -169,22 +163,28 @@ Título:
         model,
         stream: false,
         temperature: 0,
-        max_tokens: 20,
+        max_tokens: 12,
         messages: [
-          { role: 'system', content: 'Responde únicamente con un título corto en español.' },
-          { role: 'user', content: prompt }
+          {
+            role: 'system',
+            content: 'Eres un generador de títulos. Responde ÚNICAMENTE con 2 a 4 palabras en español que resuman el mensaje. Sin comillas. Sin puntos. Sin explicación. Solo las palabras del título.'
+          },
+          {
+            role: 'user',
+            content: cleanedText
+          }
         ]
       })
     });
 
-    if (!response.ok) return cleanGeneratedTitle('', normalizedText);
+    if (!response.ok) return cleanGeneratedTitle('', cleanedText);
 
     const data = await response.json();
     const rawTitle = data?.choices?.[0]?.message?.content || data?.choices?.[0]?.text || '';
-    return cleanGeneratedTitle(rawTitle, normalizedText);
+    return cleanGeneratedTitle(rawTitle, cleanedText);
   } catch (error) {
     console.error('Error en generateTitleFromText:', error);
-    return cleanGeneratedTitle('', normalizedText);
+    return cleanGeneratedTitle('', cleanedText);
   }
 }
 
