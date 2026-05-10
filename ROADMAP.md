@@ -188,3 +188,5 @@ Tempest funciona como cualquier IA básica para investigar y programar sin probl
 - [ ] Añadir app desktop con Electron
 - [ ] Añadir sincronización opcional
 - [ ] Añadir respaldo/exportación de memoria
+- [ ] Integración de correo Outlook (Microsoft Graph API + OAuth 2.0)
+- [ ] Context files por proyecto — subida manual + lectura de carpeta del disco + pantalla de configuración inicial
