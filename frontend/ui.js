@@ -315,3 +315,58 @@ if (documentData.filename) {
     behavior: 'smooth'
   });
 }
+
+/**
+ * Crea la burbuja del bot vacía y devuelve una referencia
+ * para ir escribiendo tokens en ella.
+ * Retorna { row, rawEl } donde rawEl es el <pre> que recibe texto plano.
+ */
+export function createStreamingBubble(chatBox) {
+  const row = document.createElement('div');
+  row.className = 'message-row bot';
+
+  const bubble = document.createElement('div');
+  bubble.className = 'message bot';
+
+  const label = document.createElement('div');
+  label.className = 'message-label';
+  label.textContent = 'Tempest';
+
+  // Área de texto plano que crece con cada token
+  const rawEl = document.createElement('pre');
+  rawEl.className = 'streaming-raw';
+  rawEl.style.cssText = [
+    'white-space: pre-wrap',
+    'word-break: break-word',
+    'font-family: inherit',
+    'margin: 0',
+    'min-height: 1.2em'
+  ].join(';');
+
+  bubble.appendChild(label);
+  bubble.appendChild(rawEl);
+  row.appendChild(bubble);
+  chatBox.appendChild(row);
+
+  chatBox.scrollTo({ top: chatBox.scrollHeight, behavior: 'smooth' });
+
+  return { row, bubble, rawEl };
+}
+
+/**
+ * Cuando el stream termina, reemplaza el <pre> de texto plano
+ * por el renderizado final con bloques de código y acciones.
+ */
+export function finalizeStreamingBubble(bubble, rawEl, fullText) {
+  const cleanText = fullText.replace(/<\|im_end\|>|<\|end_of_text\|>|<\|begin_of_text\|>|<\|eot_id\|>|<\|im_start\|>/g, '').trim();
+  bubble.removeChild(rawEl);
+
+  const content = document.createElement('div');
+  content.className = 'message-content';
+renderMixedContent(content, cleanText);
+
+  const actions = renderMessageActions('Tempest', cleanText);
+
+  bubble.appendChild(content);
+  bubble.appendChild(actions);
+}

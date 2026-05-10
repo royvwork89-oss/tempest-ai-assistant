@@ -237,6 +237,29 @@ Cada archivo se muestra en su propio bloque estilo terminal con etiqueta de leng
 
 ---
 
+## 🌊 Streaming de respuesta con SSE
+
+### Decisión
+Implementar streaming de respuesta usando Server-Sent Events (SSE) en el backend y `ReadableStream` en el frontend.
+
+### Razón
+Sin streaming el usuario espera en silencio hasta que LocalAI termina de generar toda la respuesta. Con streaming el texto aparece palabra por palabra igual que en ChatGPT o Claude.
+
+### Arquitectura
+- `localai.service.js` — nueva función `streamToLocalAI` (AsyncGenerator) que pide `stream: true` a LocalAI y hace `yield` de cada token.
+- `chat.controller.js` — la función `chat` usa SSE (`Content-Type: text/event-stream`) y reenvía cada token al frontend con `res.write()`.
+- `api.js` — `sendChatMessage` acepta un callback `onToken` y lee el stream con `ReadableStream`.
+- `ui.js` — `createStreamingBubble` crea la burbuja vacía antes de la llamada; `finalizeStreamingBubble` reemplaza el texto plano por el renderizado final con bloques de código al terminar.
+- `app.js` — usa `createStreamingBubble` antes de llamar a `sendChatMessage` y `finalizeStreamingBubble` al terminar.
+
+### Problema resuelto: tokens especiales de Hermes
+LocalAI con modelos Hermes envía tokens especiales (`<|im_end|>`, `<|end_of_text|>`, etc.) letra por letra, por lo que el regex no los detecta en tokens individuales. La solución fue acumular el `fullReply` completo durante el stream y aplicar la limpieza en `finalizeStreamingBubble` al renderizar, usando un regex global que elimina cualquier token `<|...|>` antes de mostrar el texto final.
+
+### Impacto
+Experiencia de usuario significativamente mejor. El texto aparece de forma progresiva. El renderizado final con bloques de código se mantiene intacto.
+
+---
+
 ## 🔮 Decisiones futuras
 
 - Implementar PPTX con extracción XML de ZIP.

@@ -1,4 +1,4 @@
-const { sendToLocalAI, generateTitleFromText } = require('../services/localai.service');
+const { sendToLocalAI, streamToLocalAI, generateTitleFromText } = require('../services/localai.service');
 const memory = require('../services/memory.service');
 const {
   buildAttachmentContext,
@@ -63,21 +63,37 @@ async function chat(req, res) {
       memory.addMessage('user', attachmentContext, memoryOptions);
     }
 
-    const reply = await sendToLocalAI(finalMessage, {
+    const streamOptions = {
       ...memoryOptions,
       primaryModel: config.primaryModel || 'hermes-q4',
       hardwareProfile: config.hardwareProfile || 'laptop'
-    });
+    };
 
-    return res.json({
-      ok: true,
-      reply,
-      attachments: attachmentNames
-    });
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders();
+
+    let fullReply = '';
+
+    for await (const token of streamToLocalAI(finalMessage, streamOptions)) {
+      if (token) {
+        const safe = JSON.stringify(token);
+        res.write(`data: ${safe}\n\n`);
+      }
+    }
+
+    res.write(`data: [DONE] ${JSON.stringify({ attachments: attachmentNames })}\n\n`);
+    res.end();
 
   } catch (error) {
     console.error('Error en chat.controller:', error);
-    return res.status(500).json({ ok: false, error: 'Error interno del servidor' });
+    if (res.headersSent) {
+      res.write(`data: [ERROR] ${error.message}\n\n`);
+      res.end();
+    } else {
+      res.status(500).json({ ok: false, error: 'Error interno del servidor' });
+    }
 
   } finally {
     cleanupFiles(files);

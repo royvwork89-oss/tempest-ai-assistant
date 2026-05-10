@@ -1,17 +1,22 @@
 # Flujo del Sistema - Tempest
 
-## 💬 Flujo normal de chat
+## 💬 Flujo normal de chat (con streaming)
 
 1. Usuario escribe mensaje.
 2. Frontend valida que no esté vacío.
 3. Si no hay chat activo, se crea uno en el contexto correcto.
-4. Frontend envía `POST /chat`.
-5. Backend detecta si el mensaje es una solicitud de explicación.
-6. Backend recibe mensaje y memoria activa.
-7. Backend envía contexto a LocalAI.
-8. LocalAI genera respuesta.
-9. Backend guarda mensaje y respuesta.
-10. Frontend renderiza respuesta (separando archivos en bloques individuales si aplica).
+4. `createStreamingBubble` crea la burbuja de respuesta vacía en el chat.
+5. Frontend envía `POST /chat` con `onToken` callback.
+6. Backend detecta si el mensaje es una solicitud de explicación.
+7. Backend construye contexto y llama a `streamToLocalAI`.
+8. Backend abre conexión SSE (`Content-Type: text/event-stream`).
+9. LocalAI genera tokens uno por uno con `stream: true`.
+10. Cada token llega al backend → se reenvía al frontend con `res.write()`.
+11. Frontend recibe cada token vía `ReadableStream` → `onToken` lo agrega a `rawEl.textContent`.
+12. Al terminar el stream, backend envía `[DONE]` con metadata de adjuntos.
+13. `finalizeStreamingBubble` reemplaza el texto plano por el renderizado final (bloques de código, links, acciones).
+14. Backend guarda la respuesta completa en `chatHistory`.
+15. Frontend dispara renombrado automático si es el primer mensaje.
 
 ---
 
@@ -26,9 +31,9 @@
 7. El texto se trunca inteligentemente según tipo (código o documento).
 8. Se construye el bloque `--- ARCHIVOS ADJUNTOS ---` y se inyecta al prompt.
 9. `chatHistory` guarda el mensaje completo con el bloque de adjuntos.
-10. LocalAI recibe el contexto completo y responde.
+10. LocalAI recibe el contexto completo y responde vía streaming.
 11. Bloque `finally`: `cleanupFiles` elimina los temporales (Capa A).
-12. Frontend renderiza la respuesta.
+12. Frontend renderiza la respuesta final.
 
 ---
 
@@ -37,8 +42,8 @@
 1. Frontend envía `userId`, `projectId` y `chatId`.
 2. Backend localiza memoria global, de proyecto y de chat.
 3. Se construye contexto.
-4. Se consulta LocalAI.
-5. Se actualiza `chatHistory`.
+4. Se consulta LocalAI vía stream.
+5. Se actualiza `chatHistory` con la respuesta completa al terminar el stream.
 
 ---
 
@@ -49,7 +54,7 @@
 3. No se crea chat todavía.
 4. Usuario escribe primer mensaje (o adjunta archivos sin texto).
 5. Se crea chat dentro de `general`.
-6. Se envía el mensaje.
+6. Se envía el mensaje con streaming.
 7. La IA genera un título corto basado en el mensaje o en los nombres de archivos adjuntos.
 8. El chat se renombra automáticamente.
 9. El sidebar muestra el nuevo nombre.
@@ -146,7 +151,37 @@
 2. `isExplanationRequest()` normaliza el texto y busca palabras clave: "explícame", "qué es", "cómo funciona", "cuéntame", etc.
 3. Si detecta solicitud de explicación y no hay archivos adjuntos → prefija el mensaje con `"Responde SOLO con texto explicativo, sin código."`.
 4. Si no detecta explicación → envía el mensaje sin modificar.
-5. El model responde acorde a la instrucción recibida.
+5. El modelo responde acorde a la instrucción recibida.
+
+---
+
+## 🌊 Flujo de streaming SSE
+
+```
+frontend/app.js
+↓ createStreamingBubble → burbuja vacía en el DOM
+↓
+api.js → POST /chat (JSON o FormData)
+↓ ReadableStream reader
+↓ onToken callback → rawEl.textContent += token
+↓
+backend/routes/chat.routes.js (multer)
+↓
+controllers/chat.controller.js
+↓ res.setHeader('Content-Type', 'text/event-stream')
+↓ for await (token of streamToLocalAI)
+↓ res.write(`data: ${JSON.stringify(token)}\n\n`)
+↓
+services/localai.service.js → streamToLocalAI (AsyncGenerator)
+↓ fetch LocalAI con stream: true
+↓ ReadableStream → yield token por token
+↓
+LocalAI genera tokens individuales
+↓
+Al terminar: res.write('[DONE] {...}') → res.end()
+↓
+frontend: finalizeStreamingBubble → renderMixedContent con limpieza de stop tokens
+```
 
 ---
 
@@ -161,3 +196,4 @@
 - Nombre demasiado corto o largo.
 - Archivo con mimetype o extensión no permitida.
 - Error de extracción de texto (PDF corrupto, DOCX dañado, etc.).
+- Error en stream: si los headers SSE ya se enviaron, se escribe `[ERROR]` y se cierra la conexión.

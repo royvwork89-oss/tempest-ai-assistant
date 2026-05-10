@@ -10,6 +10,7 @@ Tempest es un asistente local de IA construido con Node.js, Express, LocalAI y f
 
 - Comunicación con modelos vía LocalAI.
 - Interfaz tipo ChatGPT.
+- **Streaming de respuesta** — el texto aparece palabra por palabra mientras el modelo genera.
 - Chats independientes.
 - Chats agrupados por proyecto.
 - Historial persistente por chat.
@@ -157,6 +158,7 @@ POST /transcribe
 - JavaScript vanilla
 - pdf2json, mammoth, xlsx
 - PDFKit, docx
+- SSE (Server-Sent Events) para streaming
 
 ---
 
@@ -202,11 +204,12 @@ http://localhost:3005
 
 ## 🧠 Estado del proyecto
 
-Versión actual: **v0.4.2**
+Versión actual: **v0.5.0**
 
 Tempest cuenta con:
 
 - Chat local funcional con memoria por usuario/proyecto/chat
+- **Streaming de respuesta** — texto aparece palabra por palabra
 - Sidebar con proyectos y chats
 - **Modal propio para renombrar** (reemplazó `prompt()` nativo)
 - **Validación de nombres** para caracteres inválidos

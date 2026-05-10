@@ -2,7 +2,7 @@
 
 ## 🚧 Estado actual
 
-Versión actual: **v0.4.2**
+Versión actual: **v0.5.0**
 
 Sistema funcional con:
 
@@ -38,6 +38,7 @@ Sistema funcional con:
   - Contexto inyectado al prompt de LocalAI
 - **Historial de conversación corregido** (sin duplicados)
 - **Modelos Q4, Q5 y Q6 funcionando**
+- **Streaming de respuesta** — texto aparece palabra por palabra mientras LocalAI genera
 
 *preparado para futuro
 
@@ -47,7 +48,7 @@ Sistema funcional con:
 
 Tempest funciona como cualquier IA básica para investigar y programar sin problemas.
 
-- [ ] Streaming de respuesta (texto aparece palabra por palabra)
+- [x] Streaming de respuesta (texto aparece palabra por palabra)
 - [x] Modal propio para renombrar — reemplazar el prompt() nativo por un modal visual
 - [x] Mejorar prompt del generador de títulos — más rápido y preciso
 - [x] Renombrar chat cuando el primer mensaje es solo archivo adjunto sin texto
@@ -150,6 +151,13 @@ Tempest funciona como cualquier IA básica para investigar y programar sin probl
 
 ---
 
+## 🎯 v1.0 — Uso diario real
+
+Tempest funciona como cualquier IA básica para investigar y programar sin problemas.
+- [ ] Manejo de errores visual
+
+---
+
 ## 🧪 Testing
 
 - [ ] Probar `/chat` con y sin adjuntos
@@ -163,25 +171,6 @@ Tempest funciona como cualquier IA básica para investigar y programar sin probl
 - [ ] Probar `/title/generate`
 - [ ] Probar `/transcribe`
 - [ ] Probar adjuntos: PDF, DOCX, XLSX, TXT, código, imágenes
-## 🎯 v1.0 — Uso diario real
-
-Tempest funciona como cualquier IA básica para investigar y programar sin problemas.
-
-- [ ] Streaming de respuesta (texto aparece palabra por palabra)
-- [ ] Modal propio para renombrar — reemplazar el prompt() nativo por un modal visual
-- [ ] Mejorar prompt del generador de títulos — que sea más rápido y preciso
-- [ ] Renombrar chat cuando el primer mensaje es solo archivo adjunto sin texto — lógica de cuándo disparar el renombrado
-- [ ] Validación de nombres para caracteres inválidos
-- [ ] Manejo de errores visual
-
----
-
-## 🎯 v1.0 — Uso diario real
-
-Tempest funciona como cualquier IA básica para investigar y programar sin problemas.
-
-- [ ] Streaming de respuesta (texto aparece palabra por palabra)
-- [ ] Manejo de errores visual
 
 ---
 

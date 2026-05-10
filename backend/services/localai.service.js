@@ -147,11 +147,10 @@ function cleanGeneratedTitle(rawTitle, sourceText = '') {
 }
 
 async function generateTitleFromText(text, type = 'chat', model = 'hermes-q4') {
-  // Recortar el bloque de adjuntos para no confundir al modelo
   const cleanedText = String(text || '')
     .replace(/---\s*ARCHIVOS ADJUNTOS\s*---[\s\S]*/i, '')
     .trim()
-    .slice(0, 300); // suficiente contexto, sin desperdiciar tokens
+    .slice(0, 300);
 
   if (!cleanedText) return 'Nueva conversación';
 
@@ -188,7 +187,126 @@ async function generateTitleFromText(text, type = 'chat', model = 'hermes-q4') {
   }
 }
 
+// ─── STREAMING ────────────────────────────────────────────────────────────────
+
+/**
+ * Igual que sendToLocalAI pero devuelve un AsyncGenerator que
+ * yield-ea tokens conforme llegan desde LocalAI.
+ * Si LocalAI no soporta stream, hace fallback a no-stream.
+ */
+async function* streamToLocalAI(message, options = DEFAULT_MEMORY_OPTIONS) {
+  const fullMemory = memory.getFullMemory(options);
+
+  // Respuestas rápidas sin llamar a LocalAI
+  const timeAnswer = getCurrentTimeAnswer(message);
+  if (timeAnswer) {
+    memory.addChatHistoryMessage('assistant', timeAnswer, options);
+    yield timeAnswer;
+    return;
+  }
+
+  const controlledAnswer = getControlledMemoryAnswer(message, fullMemory);
+  if (controlledAnswer) {
+    memory.addChatHistoryMessage('assistant', controlledAnswer, options);
+    yield controlledAnswer;
+    return;
+  }
+
+  const lowerMessage = message.toLowerCase().trim();
+  if (lowerMessage === 'hola' || lowerMessage === 'buenas' || lowerMessage === 'hey') {
+    const name = fullMemory.profile?.name || 'Rogelio';
+    const greeting = `Hola ${name}, ¿en qué puedo ayudarte?`;
+    memory.addChatHistoryMessage('assistant', greeting, options);
+    yield greeting;
+    return;
+  }
+
+  const chatHistory = memory.getChatHistory(options)
+    .filter(msg => msg.content && msg.content.trim() !== '')
+    .slice(-7, -1)
+    .map(msg => ({ role: msg.role, content: msg.content }));
+
+  const messages = [
+    { role: 'system', content: buildSystemPrompt(fullMemory) },
+    ...chatHistory,
+    { role: 'user', content: message }
+  ];
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 300000);
+
+  let fullReply = '';
+
+  try {
+    const response = await fetch('http://127.0.0.1:8080/v1/chat/completions', {
+      method: 'POST',
+      signal: controller.signal,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: options.primaryModel || 'hermes-q4',
+        stream: true,
+        temperature: 0,
+        max_tokens: getMaxTokens(options.primaryModel, message, 'normal', options.hardwareProfile || 'laptop'),
+        messages
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Error LocalAI: ${errorText}`);
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let stopped = false;
+    const STOP_REGEX = /<\|im_end\|>|<\|end_of_text\|>|<\|begin_of_text\|>|<\|eot_id\|>|<\|im_start\|>/g;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop();
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || !trimmed.startsWith('data:')) continue;
+
+        const jsonStr = trimmed.slice(5).trim();
+        if (jsonStr === '[DONE]') { stopped = true; break; }
+
+        try {
+          const parsed = JSON.parse(jsonStr);
+          const finishReason = parsed?.choices?.[0]?.finish_reason;
+          if (finishReason === 'stop' || finishReason === 'length') { stopped = true; break; }
+
+          const rawToken = parsed?.choices?.[0]?.delta?.content;
+          if (rawToken == null) continue;
+
+          fullReply += rawToken;
+          yield rawToken;
+
+        } catch {
+          // chunk inválido, ignorar
+        }
+      }
+
+      if (stopped) break;
+    }
+  } finally {
+    clearTimeout(timeoutId);
+  }
+  // Limpiar y guardar respuesta completa
+  fullReply = cleanReply(fullReply);
+  if (!fullReply) fullReply = 'No pude generar una respuesta válida.';
+
+  memory.addChatHistoryMessage('assistant', fullReply, options);
+}
+
 module.exports = {
   sendToLocalAI,
+  streamToLocalAI,
   generateTitleFromText
 };

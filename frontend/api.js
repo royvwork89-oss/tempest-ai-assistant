@@ -1,11 +1,17 @@
 import { getMemoryQuery, getChatState } from './chatState.js';
 
-export async function sendChatMessage(message, config = {}, files = []) {
+/**
+ * onToken(token: string) → se llama con cada fragmento de texto
+ * Retorna { ok, attachments } cuando termina el stream.
+ */
+export async function sendChatMessage(message, config = {}, files = [], onToken = null) {
   const state = getChatState();
   const hasFiles = Array.isArray(files) && files.length > 0;
 
+  let fetchRes;
+
   if (!hasFiles) {
-    const res = await fetch('/chat', {
+    fetchRes = await fetch('/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -15,27 +21,61 @@ export async function sendChatMessage(message, config = {}, files = []) {
         config
       })
     });
+  } else {
+    const formData = new FormData();
+    formData.append('message', message);
+    formData.append('projectId', state.projectId);
+    formData.append('chatId', state.chatId);
+    formData.append('config', JSON.stringify(config));
+    files.forEach(file => formData.append('attachments', file));
 
-    return res.json();
+    fetchRes = await fetch('/chat', {
+      method: 'POST',
+      body: formData
+    });
   }
 
-  const formData = new FormData();
+  // ── Leer stream SSE ───────────────────────────────────────────
+  const reader = fetchRes.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let attachments = [];
 
-  formData.append('message', message);
-  formData.append('projectId', state.projectId);
-  formData.append('chatId', state.chatId);
-  formData.append('config', JSON.stringify(config));
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
 
-  files.forEach(file => {
-    formData.append('attachments', file);
-  });
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop();
 
-  const res = await fetch('/chat', {
-    method: 'POST',
-    body: formData
-  });
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith('data:')) continue;
 
-  return res.json();
+      const payload = trimmed.slice(5).trim();
+
+      if (payload.startsWith('[DONE]')) {
+        try {
+          const meta = JSON.parse(payload.slice(6).trim());
+          attachments = meta.attachments || [];
+        } catch { /* sin meta */ }
+        continue;
+      }
+
+      if (payload.startsWith('[ERROR]')) {
+        console.error('Stream error:', payload.slice(7));
+        continue;
+      }
+
+      // Restaurar saltos de línea escapados
+      let token;
+      try { token = JSON.parse(payload); } catch { token = payload; }
+      if (onToken) onToken(token);
+    }
+  }
+
+  return { ok: true, attachments };
 }
 
 export async function getChatHistory() {

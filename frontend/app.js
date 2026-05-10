@@ -13,7 +13,7 @@ import {
 } from './api.js';
 
 import { setActiveChat, getChatState } from './chatState.js';
-import { addMessage, addDocumentCard } from './ui.js';
+import { addMessage, addDocumentCard, createStreamingBubble, finalizeStreamingBubble } from './ui.js';
 import {
   HARDWARE_PROFILE,
   APP_MODE,
@@ -535,7 +535,21 @@ async function sendMessage() {
       return;
     }
 
-    const data = await sendChatMessage(message || 'Analiza los archivos adjuntos.', config, files);
+const { bubble, rawEl } = createStreamingBubble(chatBox);
+    let fullText = '';
+
+    const data = await sendChatMessage(
+      message || 'Analiza los archivos adjuntos.',
+      config,
+      files,
+      (token) => {
+        fullText += token;
+        rawEl.textContent = fullText;
+        chatBox.scrollTo({ top: chatBox.scrollHeight, behavior: 'smooth' });
+      }
+    );
+
+    finalizeStreamingBubble(bubble, rawEl, fullText);
 
     if (files.length > 0) {
       clearAttachedFiles();
@@ -544,9 +558,6 @@ async function sendMessage() {
     }
 
     if (data.ok) {
-      addMessage(chatBox, 'Tempest', data.reply);
-
-
       if (pendingAutoRename) {
         const renameTarget = { ...pendingAutoRename };
         const titleText = message.trim()
@@ -566,7 +577,7 @@ async function sendMessage() {
         }
       }
     } else {
-      addMessage(chatBox, 'Tempest', 'Ocurrió un error: ' + (data.error || 'Desconocido'));
+      addMessage(chatBox, 'Tempest', 'Ocurrió un error al conectar con el backend.');
     }
   } catch (error) {
     addMessage(chatBox, 'Tempest', 'No pude conectar con el backend.');
