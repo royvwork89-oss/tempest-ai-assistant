@@ -13,7 +13,7 @@ import {
 } from './api.js';
 
 import { setActiveChat, getChatState } from './chatState.js';
-import { addMessage, addDocumentCard, createStreamingBubble, finalizeStreamingBubble } from './ui.js';
+import { addMessage, addDocumentCard, createStreamingBubble, finalizeStreamingBubble, showErrorToast, addErrorMessage } from './ui.js';
 import {
   HARDWARE_PROFILE,
   APP_MODE,
@@ -155,7 +155,7 @@ processTranscriptionBtn.addEventListener('click', async () => {
   const file = transcriptionAudioInput.files[0];
 
   if (!file) {
-    alert('Selecciona un audio');
+    showErrorToast('Selecciona un archivo de audio antes de continuar.');
     return;
   }
 
@@ -254,14 +254,10 @@ processTranscriptionBtn.addEventListener('click', async () => {
       }
     }
 
-  } catch (error) {
+} catch (error) {
     console.error(error);
-
-    addMessage(
-      chatBox,
-      'Tempest',
-      '❌ Error procesando audio. Revisa que el archivo sea válido y que LocalAI/Whisper esté activo.'
-    );
+    showErrorToast('Error al procesar el audio. Revisa que LocalAI/Whisper esté activo.');
+    addErrorMessage(chatBox, 'No pude procesar el audio. Verifica que el archivo sea válido y que Whisper esté funcionando.');
   } finally {
     typing.textContent = '';
     sendBtn.disabled = false;
@@ -531,57 +527,66 @@ async function sendMessage() {
         return;
       }
 
-      addMessage(chatBox, 'Tempest', 'No pude generar el documento: ' + (data.error || 'Error desconocido'));
+      addErrorMessage(chatBox, 'No pude generar el documento: ' + (data.error || 'Error desconocido'));
       return;
     }
 
 const { bubble, rawEl } = createStreamingBubble(chatBox);
     let fullText = '';
 
-    const data = await sendChatMessage(
-      message || 'Analiza los archivos adjuntos.',
-      config,
-      files,
-      (token) => {
-        fullText += token;
-        rawEl.textContent = fullText;
-        chatBox.scrollTo({ top: chatBox.scrollHeight, behavior: 'smooth' });
-      }
-    );
-
-    finalizeStreamingBubble(bubble, rawEl, fullText);
-
-    if (files.length > 0) {
-      clearAttachedFiles();
-      document.getElementById('attachmentPreview').innerHTML = '';
-      document.getElementById('attachmentPreview').classList.add('hidden');
-    }
-
-    if (data.ok) {
-      if (pendingAutoRename) {
-        const renameTarget = { ...pendingAutoRename };
-        const titleText = message.trim()
-          || (files.length > 0 ? files.map(f => f.name).join(', ') : '');
-        const titleData = await generateTitle(titleText, renameTarget.type);
-
-        if (titleData.ok && titleData.title) {
-          const chatsData = await listChats(renameTarget.projectId);
-          const existingChats = Array.isArray(chatsData.chats)
-            ? chatsData.chats.filter(c => c !== renameTarget.chatId)
-            : [];
-          const uniqueTitle = makeUniqueChatTitle(titleData.title, existingChats);
-          await renameChat(renameTarget.chatId, uniqueTitle, renameTarget.projectId);
-          setActiveChat({ projectId: renameTarget.projectId, chatId: uniqueTitle, mode: renameTarget.projectId === 'general' ? 'chat' : 'project' });
-          pendingAutoRename = null;
-          await loadSidebar(sidebarDeps);
+    try {
+      const data = await sendChatMessage(
+        message || 'Analiza los archivos adjuntos.',
+        config,
+        files,
+        (token) => {
+          fullText += token;
+          rawEl.textContent = fullText;
+          chatBox.scrollTo({ top: chatBox.scrollHeight, behavior: 'smooth' });
         }
+      );
+
+      finalizeStreamingBubble(bubble, rawEl, fullText);
+
+      if (files.length > 0) {
+        clearAttachedFiles();
+        document.getElementById('attachmentPreview').innerHTML = '';
+        document.getElementById('attachmentPreview').classList.add('hidden');
       }
-    } else {
-      addMessage(chatBox, 'Tempest', 'Ocurrió un error al conectar con el backend.');
+
+      if (data.ok) {
+        if (pendingAutoRename) {
+          const renameTarget = { ...pendingAutoRename };
+          const titleText = message.trim()
+            || (files.length > 0 ? files.map(f => f.name).join(', ') : '');
+          const titleData = await generateTitle(titleText, renameTarget.type);
+
+          if (titleData.ok && titleData.title) {
+            const chatsData = await listChats(renameTarget.projectId);
+            const existingChats = Array.isArray(chatsData.chats)
+              ? chatsData.chats.filter(c => c !== renameTarget.chatId)
+              : [];
+            const uniqueTitle = makeUniqueChatTitle(titleData.title, existingChats);
+            await renameChat(renameTarget.chatId, uniqueTitle, renameTarget.projectId);
+            setActiveChat({ projectId: renameTarget.projectId, chatId: uniqueTitle, mode: renameTarget.projectId === 'general' ? 'chat' : 'project' });
+            pendingAutoRename = null;
+            await loadSidebar(sidebarDeps);
+          }
+        }
+      } else {
+        bubble.remove();
+        addErrorMessage(chatBox, 'Ocurrió un error al generar la respuesta. Intenta de nuevo.');
+      }
+    } catch (streamError) {
+      bubble.remove();
+      console.error(streamError);
+      showErrorToast('Sin conexión con el backend. ¿Está el servidor corriendo?');
+      addErrorMessage(chatBox, 'No pude conectar con el backend. Verifica que el servidor esté activo.');
     }
   } catch (error) {
-    addMessage(chatBox, 'Tempest', 'No pude conectar con el backend.');
     console.error(error);
+    showErrorToast('Error inesperado. Revisa la consola.');
+    addErrorMessage(chatBox, 'Ocurrió un error inesperado.');
   } finally {
     typing.textContent = '';
     sendBtn.disabled = false;

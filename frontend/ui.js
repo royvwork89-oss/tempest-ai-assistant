@@ -370,3 +370,60 @@ renderMixedContent(content, cleanText);
   bubble.appendChild(content);
   bubble.appendChild(actions);
 }
+
+/**
+ * Toast de error temporal en esquina superior derecha.
+ * Para errores de sistema: sin conexión, LocalAI caído, etc.
+ */
+export function showErrorToast(message, duration = 4000) {
+  const existing = document.getElementById('tempest-error-toast');
+  if (existing) existing.remove();
+
+  const toast = document.createElement('div');
+  toast.id = 'tempest-error-toast';
+  toast.className = 'error-toast';
+  toast.innerHTML = `
+    <span class="error-toast-icon">⚠️</span>
+    <span class="error-toast-text">${message}</span>
+    <button class="error-toast-close" aria-label="Cerrar">✕</button>
+  `;
+
+  document.body.appendChild(toast);
+  toast.getBoundingClientRect();
+  toast.classList.add('error-toast--visible');
+
+  const dismiss = () => {
+    toast.classList.remove('error-toast--visible');
+    setTimeout(() => toast.remove(), 300);
+  };
+
+  toast.querySelector('.error-toast-close').addEventListener('click', dismiss);
+  setTimeout(dismiss, duration);
+}
+
+/**
+ * Burbuja de error dentro del chat.
+ * Para errores contextuales: fallo al generar respuesta, etc.
+ */
+export function addErrorMessage(chatBox, message) {
+  const row = document.createElement('div');
+  row.className = 'message-row bot';
+
+  const bubble = document.createElement('div');
+  bubble.className = 'message bot message--error';
+
+  const label = document.createElement('div');
+  label.className = 'message-label';
+  label.textContent = 'Tempest';
+
+  const content = document.createElement('div');
+  content.className = 'message-content error-message-content';
+  content.innerHTML = `<span class="error-msg-icon">⚠️</span> ${message}`;
+
+  bubble.appendChild(label);
+  bubble.appendChild(content);
+  row.appendChild(bubble);
+  chatBox.appendChild(row);
+
+  chatBox.scrollTo({ top: chatBox.scrollHeight, behavior: 'smooth' });
+}

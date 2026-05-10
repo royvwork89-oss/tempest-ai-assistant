@@ -204,12 +204,13 @@ http://localhost:3005
 
 ## 🧠 Estado del proyecto
 
-Versión actual: **v0.5.0**
+Versión actual: **v1.0.0**
 
 Tempest cuenta con:
 
 - Chat local funcional con memoria por usuario/proyecto/chat
 - **Streaming de respuesta** — texto aparece palabra por palabra
+- **Manejo de errores visual** — toast de sistema + burbuja de error en chat
 - Sidebar con proyectos y chats
 - **Modal propio para renombrar** (reemplazó `prompt()` nativo)
 - **Validación de nombres** para caracteres inválidos
