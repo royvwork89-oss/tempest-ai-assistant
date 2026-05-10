@@ -152,13 +152,13 @@ Mayor privacidad, mayor carga técnica, requiere limpieza de temporales.
 ## 📎 Sistema de adjuntos con extracción de texto
 
 ### Decisión
-Extraer texto de los archivos adjuntos en el backend e inyectarlo al prompt como contexto plano, en lugar de enviar el archivo directamente a LocalAI.
+Extraer texto de los archivos adjuntos en el backend e inyectarlo al prompt como contexto plano.
 
 ### Razón
 LocalAI solo recibe texto. No puede procesar archivos binarios directamente.
 
 ### Impacto
-LocalAI puede "leer" documentos sin soporte nativo de archivos. Diferencia entre calidad de extracción según tipo de archivo.
+LocalAI puede "leer" documentos sin soporte nativo de archivos.
 
 ---
 
@@ -204,36 +204,91 @@ Permite preguntas de seguimiento con acceso al contenido del archivo.
 ### Decisión
 Soportar tres perfiles de calidad de modelo GGUF: Q4 (rápido), Q5 (equilibrado), Q6 (calidad).
 
-### Fix aplicado
-- El nombre de archivo en los YAML usaba guión en lugar de punto antes de Q5/Q6.
-- `n_gpu_layers` debe ir dentro de `parameters`, no como campo raíz.
-- `hermes-q5.yaml` tenía un carácter `ç` inválido en la línea `template:ç`.
+---
+
+## 🧠 Router de modos: coder / explain / general
+
+### Decisión
+Crear `services/mode.router.js` como módulo independiente que detecta el modo de respuesta por mensaje.
+
+### Razón
+La detección binaria anterior (explicación vs código) no cubría casos mixtos ni adjuntos no-código. Separar la lógica en su propio archivo permite testearla, extenderla y leerla de forma independiente sin tocar el controller.
+
+### Arquitectura
+- `mode.router.js` — `detectMode({ rawMessage, files, configMode })` → `{ mode, variant, reason }`
+- `chat.controller.js` — llama al router, aplica prefijo según `variant`, pasa `mode` a `streamOptions`
+- `localai.service.js` — pasa `options.mode` a `getMaxTokens`
+- `token.profiles.js` — `getMaxTokens` acepta `'coder'|'explain'|'general'|'continue'`
+
+### Heurística (orden de prioridad)
+1. Override manual del frontend (`config.mode`) → gana siempre
+2. Sin texto + adjunto de código → `coder/strict`
+3. Sin texto + adjunto no-código → `explain`
+4. Adjunto + verbo técnico → `coder/strict`
+5. Adjunto + verbo de lectura → `explain`
+6. Trigger código explícito + trigger explicación → `coder/hybrid`
+7. Trigger explicación + tecnología mencionada → `explain`
+8. Solo trigger de código → `coder/strict`
+9. Default → `general`
+
+### Submodos internos (variant)
+- `strict` — solo código/archivos, sin explicación
+- `hybrid` — explicación breve + código
+- `null` — sin modificación al mensaje
+
+### Texto default del frontend
+El mensaje `"Analiza los archivos adjuntos."` que manda el frontend cuando no hay texto escrito se trata como texto vacío en el router para no interferir con la detección por tipo de adjunto.
+
+### Log
+```
+[MODE ROUTER] mode=coder variant=hybrid reason="trigger mixto: explicación + código explícito"
+```
+
+### Impacto
+Respuestas más precisas según intención. Tokens ajustados automáticamente al modo. Sin `confidence` — se agrega cuando haya datos reales para calibrarlo.
 
 ---
 
-## 🧠 Detección de intención en el backend
+## 💬 Íconos SVG en botones de acción
 
 ### Decisión
-Detectar en `chat.controller.js` si el mensaje es una solicitud de explicación (palabras clave: "explícame", "qué es", "cómo funciona", etc.) y agregar un prefijo al mensaje antes de enviarlo al modelo.
+Reemplazar texto ("Copiar", "Editar", "Compartir") por íconos SVG inline en los botones de acción por mensaje y en el botón de copiar de bloques de código.
 
 ### Razón
-El system prompt con reglas de código agresivas hacía que el modelo respondiera con código incluso ante preguntas de explicación. Modificar el system prompt afectaba la entrega de múltiples archivos.
+Consistencia visual con Claude y ChatGPT. Menos espacio ocupado. Mejor experiencia en hover.
 
 ### Impacto
-El modelo responde con texto cuando se le pide explicar y con código cuando se le pide implementar, sin sacrificar la capacidad de entregar múltiples archivos.
+- Botones visibles solo al hacer hover sobre el mensaje (`opacity: 0` → `opacity: 1`).
+- `user-select: none` en `.message-actions` evita que los botones se incluyan al seleccionar texto.
+- Ícono cambia a checkmark al copiar y vuelve al original tras 1.5s.
 
 ---
 
-## 🖥️ Separación de múltiples archivos en el frontend
+## ⌨️ Rediseño del área de entrada
 
 ### Decisión
-El `renderMixedContent` en `ui.js` detecta tanto bloques con triple backtick como patrones de texto plano `Archivo: nombre.ext` y `nombre.ext:` para separar archivos en bloques individuales de código.
+Cambiar el layout del input de grid a flexbox con dos secciones: textarea arriba, barra de herramientas abajo.
 
 ### Razón
-Los modelos locales no siempre usan backticks consistentemente. El frontend debe ser tolerante a distintos formatos de salida.
+El grid anterior causaba que el botón de enviar se desplazara o quedara invisible al crecer el textarea. La barra inferior con flexbox `justify-content: space-between` mantiene `+` a la izquierda y enviar a la derecha siempre visibles.
+
+### Estructura
+```
+┌─────────────────────────────────┐
+│  [adjuntos si los hay]          │
+│  textarea (crece hacia arriba)  │
+├─────────────────────────────────┤
+│  [+]              [➤ enviar]    │
+└─────────────────────────────────┘
+```
+
+### Botón enviar
+- Ícono avión de papel (SVG `fill="currentColor"`).
+- Siempre visible en la barra inferior.
+- Color azul `#2563eb`, hover `#1d4ed8`.
 
 ### Impacto
-Cada archivo se muestra en su propio bloque estilo terminal con etiqueta de lenguaje y botón de copiar individual.
+Layout estable sin importar el tamaño del texto. Botones siempre accesibles.
 
 ---
 
@@ -243,34 +298,25 @@ Cada archivo se muestra en su propio bloque estilo terminal con etiqueta de leng
 Implementar streaming de respuesta usando Server-Sent Events (SSE) en el backend y `ReadableStream` en el frontend.
 
 ### Razón
-Sin streaming el usuario espera en silencio hasta que LocalAI termina de generar toda la respuesta. Con streaming el texto aparece palabra por palabra igual que en ChatGPT o Claude.
-
-### Arquitectura
-- `localai.service.js` — nueva función `streamToLocalAI` (AsyncGenerator) que pide `stream: true` a LocalAI y hace `yield` de cada token.
-- `chat.controller.js` — la función `chat` usa SSE (`Content-Type: text/event-stream`) y reenvía cada token al frontend con `res.write()`.
-- `api.js` — `sendChatMessage` acepta un callback `onToken` y lee el stream con `ReadableStream`.
-- `ui.js` — `createStreamingBubble` crea la burbuja vacía antes de la llamada; `finalizeStreamingBubble` reemplaza el texto plano por el renderizado final con bloques de código al terminar.
-- `app.js` — usa `createStreamingBubble` antes de llamar a `sendChatMessage` y `finalizeStreamingBubble` al terminar.
+Sin streaming el usuario espera en silencio hasta que LocalAI termina de generar toda la respuesta.
 
 ### Problema resuelto: tokens especiales de Hermes
-LocalAI con modelos Hermes envía tokens especiales (`<|im_end|>`, `<|end_of_text|>`, etc.) letra por letra, por lo que el regex no los detecta en tokens individuales. La solución fue acumular el `fullReply` completo durante el stream y aplicar la limpieza en `finalizeStreamingBubble` al renderizar, usando un regex global que elimina cualquier token `<|...|>` antes de mostrar el texto final.
+LocalAI con modelos Hermes envía tokens especiales letra por letra. La solución fue limpiarlos en `finalizeStreamingBubble` sobre el `fullText` acumulado.
 
 ### Impacto
-Experiencia de usuario significativamente mejor. El texto aparece de forma progresiva. El renderizado final con bloques de código se mantiene intacto.
+Experiencia de usuario significativamente mejor.
 
 ---
 
 ## 🔮 Decisiones futuras
 
 - Implementar PPTX con extracción XML de ZIP.
-- Implementar LibreOffice headless desde Node para mejor calidad de extracción.
+- Implementar LibreOffice headless desde Node.
 - **Modo híbrido de modelos:** LocalAI con Qwen2.5-Coder-14B para código rutinario, Claude API / OpenAI API para arquitectura compleja.
 - Migrar memoria JSON a base de datos.
 - Añadir login real.
 - Añadir resumen automático por chat/proyecto.
 - Añadir embeddings para búsqueda semántica.
-- Función de voz al chat: hablar → texto → consulta.
-- Stream de audio en vivo con Faster-Whisper.
-- Ordenar chats por fecha de último mensaje y mover al tope al recibir nuevo mensaje.
-- Reemplazar botones de copiar por íconos estilo ChatGPT/Claude.
+- Añadir `confidence` al router de modos cuando haya datos reales para calibrarlo.
+- Ordenar chats por fecha de último mensaje.
 - Mostrar opciones de acción al seleccionar texto manualmente.

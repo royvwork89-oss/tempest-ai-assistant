@@ -58,7 +58,7 @@ async function sendToLocalAI(message, options = DEFAULT_MEMORY_OPTIONS) {
       model: options.primaryModel || 'hermes-q4',
       stream: false,
       temperature: 0,
-      max_tokens: getMaxTokens(options.primaryModel, message, 'normal', options.hardwareProfile || 'laptop'),
+      max_tokens: getMaxTokens(options.primaryModel, message, options.mode || 'general', options.hardwareProfile || 'laptop'),
       messages
     })
   });
@@ -246,7 +246,7 @@ async function* streamToLocalAI(message, options = DEFAULT_MEMORY_OPTIONS) {
         model: options.primaryModel || 'hermes-q4',
         stream: true,
         temperature: 0,
-        max_tokens: getMaxTokens(options.primaryModel, message, 'normal', options.hardwareProfile || 'laptop'),
+        max_tokens: getMaxTokens(options.primaryModel, message, options.mode || 'general', options.hardwareProfile || 'laptop'),
         messages
       })
     });

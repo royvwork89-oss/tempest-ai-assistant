@@ -29,51 +29,44 @@ export function addMessage(chatBox, sender, text) {
   });
 }
 
+const ICONS = {
+  copy: `<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`,
+  check: `<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`,
+  edit: `<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`,
+  share: `<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>`,
+  retry: `<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.63"/></svg>`
+};
+
+function makeActionBtn(icon, tooltip, disabled = false) {
+  const btn = document.createElement('button');
+  btn.className = 'message-action-btn' + (disabled ? ' disabled-action' : '');
+  btn.innerHTML = icon;
+  btn.title = tooltip;
+  btn.disabled = disabled;
+  return btn;
+}
+
 function renderMessageActions(sender, text) {
   const actions = document.createElement('div');
   actions.className = 'message-actions';
 
-  const copyBtn = document.createElement('button');
-  copyBtn.textContent = 'Copiar';
-  copyBtn.className = 'message-action-btn';
-
+  const copyBtn = makeActionBtn(ICONS.copy, 'Copiar');
   copyBtn.onclick = async () => {
     try {
       await navigator.clipboard.writeText(String(text || ''));
-
-      copyBtn.textContent = 'Copiado ✓';
-
-      setTimeout(() => {
-        copyBtn.textContent = 'Copiar';
-      }, 1500);
+      copyBtn.innerHTML = ICONS.check;
+      setTimeout(() => { copyBtn.innerHTML = ICONS.copy; }, 1500);
     } catch (error) {
-      copyBtn.textContent = 'Error';
       console.error('No se pudo copiar el mensaje:', error);
     }
   };
-
   actions.appendChild(copyBtn);
 
   if (sender === 'Tú') {
-    const editBtn = document.createElement('button');
-    editBtn.textContent = 'Editar';
-    editBtn.className = 'message-action-btn disabled-action';
-    editBtn.disabled = true;
-
-    actions.appendChild(editBtn);
+    actions.appendChild(makeActionBtn(ICONS.edit, 'Editar', true));
   } else {
-    const shareBtn = document.createElement('button');
-    shareBtn.textContent = 'Compartir';
-    shareBtn.className = 'message-action-btn disabled-action';
-    shareBtn.disabled = true;
-
-    const retryBtn = document.createElement('button');
-    retryBtn.textContent = 'Intentarlo nuevamente';
-    retryBtn.className = 'message-action-btn disabled-action';
-    retryBtn.disabled = true;
-
-    actions.appendChild(shareBtn);
-    actions.appendChild(retryBtn);
+    actions.appendChild(makeActionBtn(ICONS.share, 'Compartir', true));
+    actions.appendChild(makeActionBtn(ICONS.retry, 'Intentarlo nuevamente', true));
   }
 
   return actions;
@@ -210,20 +203,16 @@ function renderCodeBlock(code, language) {
   lang.textContent = language.toUpperCase();
 
   const copyBtn = document.createElement('button');
-  copyBtn.textContent = 'Copiar';
+  copyBtn.innerHTML = ICONS.copy;
   copyBtn.className = 'copy-btn';
+  copyBtn.title = 'Copiar código';
 
   copyBtn.onclick = async () => {
     try {
       await navigator.clipboard.writeText(code);
-
-      copyBtn.textContent = 'Copiado ✓';
-
-      setTimeout(() => {
-        copyBtn.textContent = 'Copiar';
-      }, 1500);
+      copyBtn.innerHTML = ICONS.check;
+      setTimeout(() => { copyBtn.innerHTML = ICONS.copy; }, 1500);
     } catch (error) {
-      copyBtn.textContent = 'Error';
       console.error('No se pudo copiar el código:', error);
     }
   };
@@ -282,16 +271,16 @@ export function addDocumentCard(chatBox, documentData) {
   viewBtn.target = '_blank';
   viewBtn.rel = 'noopener noreferrer';
 
-const downloadBtn = document.createElement('a');
-downloadBtn.textContent = 'Descargar';
-downloadBtn.className = 'document-btn primary';
-downloadBtn.href = documentData.downloadUrl || documentData.fileUrl;
-downloadBtn.target = '_blank';
-downloadBtn.rel = 'noopener noreferrer';
+  const downloadBtn = document.createElement('a');
+  downloadBtn.textContent = 'Descargar';
+  downloadBtn.className = 'document-btn primary';
+  downloadBtn.href = documentData.downloadUrl || documentData.fileUrl;
+  downloadBtn.target = '_blank';
+  downloadBtn.rel = 'noopener noreferrer';
 
-if (documentData.filename) {
-  downloadBtn.setAttribute('download', documentData.filename);
-}
+  if (documentData.filename) {
+    downloadBtn.setAttribute('download', documentData.filename);
+  }
 
   actions.appendChild(viewBtn);
   actions.appendChild(downloadBtn);
@@ -363,7 +352,7 @@ export function finalizeStreamingBubble(bubble, rawEl, fullText) {
 
   const content = document.createElement('div');
   content.className = 'message-content';
-renderMixedContent(content, cleanText);
+  renderMixedContent(content, cleanText);
 
   const actions = renderMessageActions('Tempest', cleanText);
 

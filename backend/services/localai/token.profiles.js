@@ -18,13 +18,16 @@ function isCodeRequest(message) {
     .test(String(message || ''));
 }
 
-function getMaxTokens(model, message, mode = 'normal', hardwareProfile = 'laptop') {
+function getMaxTokens(model, message, mode = 'general', hardwareProfile = 'laptop') {
   const selectedHardware = HARDWARE_TOKEN_PROFILES[hardwareProfile] ? hardwareProfile : 'laptop';
   const selectedModel = model || 'hermes-q4';
   const hardwareConfig = HARDWARE_TOKEN_PROFILES[selectedHardware];
   const modelConfig = hardwareConfig[selectedModel] || hardwareConfig.default;
 
   if (mode === 'continue') return modelConfig.continue;
+  if (mode === 'coder') return modelConfig.code;
+  if (mode === 'explain') return modelConfig.normal;
+  // general o legacy: fallback al regex anterior
   if (isCodeRequest(message)) return modelConfig.code;
   return modelConfig.normal;
 }

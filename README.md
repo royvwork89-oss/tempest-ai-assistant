@@ -14,7 +14,17 @@ Tempest es un asistente local de IA construido con Node.js, Express, LocalAI y f
 - Chats independientes.
 - Chats agrupados por proyecto.
 - Historial persistente por chat.
-- Detección de intención: responde con texto para explicaciones, con código para implementaciones.
+- **Router de modos automático** — detecta si el mensaje es `coder`, `explain` o `general` y ajusta instrucciones y tokens.
+
+### 🤖 Router de modos
+
+- `coder/strict` — código puro: implementaciones, endpoints, archivos.
+- `coder/hybrid` — explicación breve + código: cuando el usuario pide ambas cosas.
+- `explain` — texto explicativo sin código: conceptos, definiciones, análisis de documentos.
+- `general` — conversación normal.
+- Detección automática por heurística (triggers + tipo de adjunto).
+- Override manual desde el frontend via `config.mode`.
+- Log en consola: `[MODE ROUTER] mode=coder variant=hybrid reason="..."`.
 
 ### 📎 Archivos adjuntos
 
@@ -70,9 +80,24 @@ proyecto
 
 ### 🖥️ Renderizado de código
 
-- Bloques de código estilo terminal con etiqueta de lenguaje y botón de copiar.
+- Bloques de código estilo terminal con etiqueta de lenguaje y botón de copiar (ícono SVG).
 - Separación automática de múltiples archivos en bloques individuales.
 - Detección de formatos: triple backtick y patrones `Archivo: nombre.ext` en texto plano.
+
+### 💬 Acciones por mensaje
+
+- Íconos SVG estilo Claude/ChatGPT — sin texto, solo símbolos.
+- Aparecen al hacer hover sobre el mensaje.
+- `user-select: none` — al seleccionar texto del chat los botones no se incluyen en la selección.
+- Acciones: copiar, editar (futuro), compartir (futuro), reintentar (futuro).
+
+### ⌨️ Área de entrada
+
+- Textarea autoexpandible con límite de altura.
+- Input multilínea con `Shift + Enter`.
+- Botón `+` fijo a la izquierda (menú de herramientas).
+- Botón enviar (ícono avión de papel) fijo a la derecha.
+- Barra de botones siempre visible debajo del textarea, sin importar el tamaño del texto.
 
 ---
 
@@ -80,51 +105,33 @@ proyecto
 
 ```text
 backend/
-├── config/
-│   └── systemPrompt.js
-├── controllers/
-│   ├── chat.controller.js
-│   └── transcription.controller.js
-├── data/
-│   └── users/
-│       └── local-user/
-│           ├── profile.json
-│           └── projects/
-│               └── project-name/
-│                   ├── projectMemory.json
-│                   └── chats/
-├── outputs/
-│   └── transcriptions/
-├── routes/
-│   ├── chat.routes.js
-│   └── transcription.routes.js
+├── config/systemPrompt.js
+├── controllers/chat.controller.js
+├── controllers/transcription.controller.js
+├── routes/chat.routes.js
+├── routes/transcription.routes.js
 ├── services/
 │   ├── attachment.service.js
 │   ├── localai.service.js
-│   ├── localai/
-│   │   ├── memory.answers.js
-│   │   ├── response.validator.js
-│   │   └── token.profiles.js
 │   ├── memory.service.js
-│   └── transcription.service.js
-├── uploads/
-│   ├── attachments/
-│   ├── audio/
-│   └── chunks/
-├── utils/
-│   └── cleanReply.js
+│   ├── mode.router.js          ← NUEVO
+│   ├── transcription.service.js
+│   └── localai/
+│       ├── memory.answers.js
+│       ├── response.validator.js
+│       └── token.profiles.js
+├── utils/cleanReply.js
 └── server.js
 
 frontend/
-├── modules/
-│   ├── attachments.js
-│   ├── models.js
-│   └── sidebar.js
-├── index.html
+├── modules/models.js
+├── modules/sidebar.js
+├── modules/attachments.js
 ├── app.js
 ├── api.js
 ├── chatState.js
 ├── ui.js
+├── index.html
 └── styles.css
 ```
 
@@ -204,33 +211,29 @@ http://localhost:3005
 
 ## 🧠 Estado del proyecto
 
-Versión actual: **v1.0.0**
+Versión actual: **v1.1.0**
 
 Tempest cuenta con:
 
 - Chat local funcional con memoria por usuario/proyecto/chat
 - **Streaming de respuesta** — texto aparece palabra por palabra
-- **Manejo de errores visual** — toast de sistema + burbuja de error en chat
+- **Router de modos automático** — `coder/strict`, `coder/hybrid`, `explain`, `general`
 - Sidebar con proyectos y chats
-- **Modal propio para renombrar** (reemplazó `prompt()` nativo)
-- **Validación de nombres** para caracteres inválidos
+- Modal propio para renombrar con validación inline
+- Validación de nombres para caracteres inválidos
 - Eliminar chats y proyectos con modal de confirmación
-- Generación automática de títulos de chat (optimizado)
-- **Renombrado de chat cuando el primer mensaje es solo archivo adjunto**
+- Generación automática de títulos de chat
+- Renombrado de chat cuando el primer mensaje es solo archivo adjunto
 - Transcripción de audio con exportación TXT/PDF/DOCX
 - Renderizado de bloques de código estilo terminal
-- **Separación automática de múltiples archivos en bloques individuales**
-- **Detección de intención** — texto para explicaciones, código para implementaciones
-- Botón para copiar código dentro de bloques
-- Input multilínea con `Shift + Enter`
-- Textarea autoexpandible con límite de altura
-- Modo selección para eliminar múltiples chats independientes
-- Botones de acción por mensaje (copiar, editar*, compartir*, reintentar*)
-- **Adjuntos funcionales**: PDF, DOCX, XLSX, TXT, código, imágenes
-- **Modelos Q4, Q5 y Q6 funcionando**
-- **Historial de conversación corregido** (sin duplicados)
-
-*preparado para futuro
+- Separación automática de múltiples archivos en bloques individuales
+- Botones de acción por mensaje con **íconos SVG** (sin texto)
+- Acciones visibles solo al hacer hover, sin interferir con selección de texto
+- Botón enviar con **ícono de avión de papel** dentro del área de entrada
+- Barra de herramientas fija debajo del textarea (+ a la izquierda, enviar a la derecha)
+- Adjuntos funcionales: PDF, DOCX, XLSX, TXT, código, imágenes
+- Modelos Q4, Q5 y Q6 funcionando
+- Historial de conversación sin duplicados
 
 ---
 

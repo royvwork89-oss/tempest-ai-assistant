@@ -7,16 +7,50 @@
 3. Si no hay chat activo, se crea uno en el contexto correcto.
 4. `createStreamingBubble` crea la burbuja de respuesta vacía en el chat.
 5. Frontend envía `POST /chat` con `onToken` callback.
-6. Backend detecta si el mensaje es una solicitud de explicación.
-7. Backend construye contexto y llama a `streamToLocalAI`.
-8. Backend abre conexión SSE (`Content-Type: text/event-stream`).
-9. LocalAI genera tokens uno por uno con `stream: true`.
-10. Cada token llega al backend → se reenvía al frontend con `res.write()`.
-11. Frontend recibe cada token vía `ReadableStream` → `onToken` lo agrega a `rawEl.textContent`.
-12. Al terminar el stream, backend envía `[DONE]` con metadata de adjuntos.
-13. `finalizeStreamingBubble` reemplaza el texto plano por el renderizado final (bloques de código, links, acciones).
-14. Backend guarda la respuesta completa en `chatHistory`.
-15. Frontend dispara renombrado automático si es el primer mensaje.
+6. Backend llama a `detectMode({ rawMessage, files, configMode })`.
+7. `mode.router.js` evalúa heurística y devuelve `{ mode, variant, reason }`.
+8. Backend loguea: `[MODE ROUTER] mode=X variant=Y reason="Z"`.
+9. `buildPrefixedMessage` aplica prefijo según modo y variante.
+10. Backend construye contexto y llama a `streamToLocalAI` con `options.mode`.
+11. `getMaxTokens` asigna presupuesto de tokens según modo.
+12. Backend abre conexión SSE (`Content-Type: text/event-stream`).
+13. LocalAI genera tokens uno por uno con `stream: true`.
+14. Cada token llega al backend → se reenvía al frontend con `res.write()`.
+15. Frontend recibe cada token vía `ReadableStream` → `onToken` lo agrega a `rawEl.textContent`.
+16. Al terminar el stream, backend envía `[DONE]` con metadata de adjuntos.
+17. `finalizeStreamingBubble` reemplaza el texto plano por el renderizado final.
+18. Backend guarda la respuesta completa en `chatHistory`.
+19. Frontend dispara renombrado automático si es el primer mensaje.
+
+---
+
+## 🎯 Flujo del router de modos
+
+```text
+chat.controller.js recibe rawMessage + files + config
+↓
+detectMode({ rawMessage, files, configMode })
+↓
+mode.router.js evalúa en orden:
+  1. ¿config.mode existe? → override, retorna inmediatamente
+  2. ¿sin texto + adjunto código? → coder/strict
+  3. ¿sin texto + adjunto no-código? → explain
+  4. ¿adjunto + verbo técnico? → coder/strict
+  5. ¿adjunto + verbo lectura? → explain
+  6. ¿trigger código + trigger explicación? → coder/hybrid
+  7. ¿solo trigger explicación? → explain
+  8. ¿solo trigger código? → coder/strict
+  9. default → general
+↓
+{ mode, variant, reason }
+↓
+buildPrefixedMessage:
+  explain    → "Responde SOLO con texto explicativo... {mensaje}"
+  hybrid     → "Explica brevemente y luego entrega el código... {mensaje}"
+  strict/general → mensaje sin modificar
+↓
+streamOptions.mode = mode → getMaxTokens usa mode para tokens
+```
 
 ---
 
@@ -26,9 +60,9 @@
 2. Frontend muestra chips visuales de los archivos.
 3. Al enviar, `api.js` construye un `FormData` con el mensaje y los archivos.
 4. Backend recibe la petición via multer, guarda temporales en `uploads/attachments/`.
-5. `attachment.service.js` valida cada archivo (mimetype + extensión + magic bytes para PDF).
-6. Se extrae texto según tipo: pdf2json / mammoth / xlsx / fs.readFile / placeholder imagen.
-7. El texto se trunca inteligentemente según tipo (código o documento).
+5. `detectMode` evalúa tipo de adjunto + texto para determinar modo.
+6. `attachment.service.js` extrae texto según tipo (pdf2json / mammoth / xlsx / readFile / placeholder).
+7. El texto se trunca inteligentemente según tipo.
 8. Se construye el bloque `--- ARCHIVOS ADJUNTOS ---` y se inyecta al prompt.
 9. `chatHistory` guarda el mensaje completo con el bloque de adjuntos.
 10. LocalAI recibe el contexto completo y responde vía streaming.
@@ -76,25 +110,13 @@
 
 ---
 
-## 📂 Flujo de nuevo chat dentro de proyecto
-
-1. Usuario expande proyecto.
-2. Presiona `+ Nuevo chat` dentro del proyecto.
-3. Se muestra pantalla inicial.
-4. Usuario escribe primer mensaje.
-5. Se crea chat dentro de ese proyecto.
-6. La IA genera el título del chat.
-7. El sidebar se actualiza.
-
----
-
 ## ✏️ Flujo de renombrar
 
 1. Usuario abre menú de tres puntos.
 2. Selecciona `Renombrar`.
 3. Se abre modal propio con el nombre actual pre-cargado.
 4. Usuario escribe nuevo nombre.
-5. Se valida el nombre (caracteres inválidos, longitud mínima/máxima).
+5. Se valida el nombre.
 6. Si hay error, se muestra en rojo sin cerrar el modal.
 7. Si es válido, Frontend llama a `/chat/rename` o `/project/rename`.
 8. Backend renombra archivo o carpeta.
@@ -112,6 +134,17 @@
 6. Backend elimina archivo o carpeta.
 7. UI vuelve a pantalla inicial.
 8. Sidebar se actualiza.
+
+---
+
+## 💬 Flujo de acciones por mensaje
+
+1. Usuario hace hover sobre un mensaje.
+2. `.message-actions` pasa de `opacity: 0` a `opacity: 1`.
+3. Usuario hace clic en ícono de copiar.
+4. `navigator.clipboard.writeText(text)` copia el contenido.
+5. Ícono cambia a checkmark durante 1.5s y vuelve al original.
+6. Si el usuario selecciona texto manualmente, los botones no se incluyen en la selección (`user-select: none`).
 
 ---
 
@@ -141,17 +174,6 @@
 **Capa B — job escoba:**
 - `server.js` ejecuta `setInterval` cada 6 horas.
 - Recorre `uploads/attachments/` y elimina archivos con más de 24h de antigüedad.
-- Actúa como red de seguridad si la Capa A falla.
-
----
-
-## 🧠 Flujo de detección de intención
-
-1. `chat.controller.js` recibe el mensaje del usuario.
-2. `isExplanationRequest()` normaliza el texto y busca palabras clave: "explícame", "qué es", "cómo funciona", "cuéntame", etc.
-3. Si detecta solicitud de explicación y no hay archivos adjuntos → prefija el mensaje con `"Responde SOLO con texto explicativo, sin código."`.
-4. Si no detecta explicación → envía el mensaje sin modificar.
-5. El modelo responde acorde a la instrucción recibida.
 
 ---
 
@@ -165,15 +187,16 @@ api.js → POST /chat (JSON o FormData)
 ↓ ReadableStream reader
 ↓ onToken callback → rawEl.textContent += token
 ↓
-backend/routes/chat.routes.js (multer)
-↓
-controllers/chat.controller.js
+backend/controllers/chat.controller.js
+↓ detectMode → { mode, variant, reason }
+↓ buildPrefixedMessage → userMessage con prefijo según variant
 ↓ res.setHeader('Content-Type', 'text/event-stream')
 ↓ for await (token of streamToLocalAI)
 ↓ res.write(`data: ${JSON.stringify(token)}\n\n`)
 ↓
 services/localai.service.js → streamToLocalAI (AsyncGenerator)
 ↓ fetch LocalAI con stream: true
+↓ getMaxTokens(model, message, options.mode, hardwareProfile)
 ↓ ReadableStream → yield token por token
 ↓
 LocalAI genera tokens individuales

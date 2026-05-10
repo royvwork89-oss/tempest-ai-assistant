@@ -330,30 +330,42 @@ body {
 /* ── Acciones por mensaje ── */
 .message-actions {
   display: flex;
-  gap: 8px;
+  gap: 4px;
   margin-top: 10px;
-  opacity: 0.85;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.message:hover .message-actions {
+  opacity: 1;
 }
 
 .message-action-btn {
-  width: auto !important;
+  width: 28px !important;
+  height: 28px !important;
   margin: 0 !important;
-  padding: 5px 9px !important;
-  border-radius: 8px !important;
-  border: 1px solid rgba(148, 163, 184, 0.18) !important;
-  background: rgba(15, 23, 42, 0.65) !important;
-  color: #cbd5e1 !important;
-  font-size: 12px !important;
+  padding: 0 !important;
+  border-radius: 6px !important;
+  border: 1px solid transparent !important;
+  background: transparent !important;
+  color: #94a3b8 !important;
   cursor: pointer;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
 
 .message-action-btn:hover:not(:disabled) {
   background: rgba(51, 65, 85, 0.95) !important;
-  color: #ffffff !important;
+  color: #e2e8f0 !important;
+  border-color: rgba(148, 163, 184, 0.2) !important;
 }
 
 .disabled-action {
-  opacity: 0.45;
+  opacity: 0.3;
   cursor: not-allowed !important;
 }
 
@@ -378,21 +390,27 @@ body {
   font-size: 12px;
   font-weight: bold;
 }
-
+//botón de copiar de los bloques de código:
 .copy-btn {
-  width: auto !important;
+  width: 28px !important;
+  height: 28px !important;
   margin: 0 !important;
-  padding: 5px 10px !important;
-  background: #1e293b !important;
-  color: #e2e8f0 !important;
-  border: 1px solid rgba(148, 163, 184, 0.2) !important;
-  border-radius: 8px !important;
+  padding: 0 !important;
+  background: transparent !important;
+  color: #94a3b8 !important;
+  border: 1px solid transparent !important;
+  border-radius: 6px !important;
   cursor: pointer;
-  font-size: 12px;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
 
 .copy-btn:hover {
-  background: #334155 !important;
+  background: #1e293b !important;
+  color: #e2e8f0 !important;
+  border-color: rgba(148, 163, 184, 0.2) !important;
 }
 
 .code-block pre {
@@ -468,47 +486,14 @@ body {
 
 /* ── Input y herramientas ── */
 .chat-input-area {
-  display: flex;
-  align-items: flex-end;
-  gap: 12px;
-  padding: 18px;
-  border-top: 1px solid rgba(148, 163, 184, 0.12);
+  padding: 12px 24px 20px;
   background: rgba(15, 23, 42, 0.98);
-}
-
-.chat-input-area button {
-  padding: 14px 20px;
-  border: none;
-  border-radius: 14px;
-  background: #3b82f6;
-  color: white;
-  font-size: 15px;
-  cursor: pointer;
-  transition: 0.2s ease;
-}
-
-.chat-input-area button:hover {
-  background: #2563eb;
-}
-
-.chat-input-area button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-#sendBtn {
-  height: 48px;
-  align-self: flex-end;
-  flex-shrink: 0;
+  border-top: 1px solid rgba(148, 163, 184, 0.1);
 }
 
 .input-wrapper {
-  flex: 1;
-  max-height: 550px;
-  display: grid;
-  grid-template-columns: 46px 1fr;
-  grid-template-rows: auto auto;
-  align-items: end;
+  display: flex;
+  flex-direction: column;
   background: #0f172a;
   border: 1px solid rgba(148, 163, 184, 0.2);
   border-radius: 14px;
@@ -520,12 +505,22 @@ body {
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
 }
 
+.attachment-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+  overflow-y: auto;
+  max-height: 120px;
+  height: auto;
+}
+
 .input-wrapper textarea {
-  grid-column: 2;
-  grid-row: 2;
+  width: 100%;
   min-height: 46px;
-  max-height: 400px;
-  padding: 14px 16px;
+  max-height: 200px;
+  padding: 14px 16px 6px;
   border: none;
   background: transparent;
   color: #f8fafc;
@@ -542,38 +537,45 @@ body {
   box-shadow: none;
 }
 
-.attachment-preview {
-  grid-column: 1 / 3;
-  grid-row: 1;
-  height: 150px;
-  max-height: 150px;
-  padding: 10px 12px;
-  border-bottom: 1px solid rgba(148, 163, 184, 0.14);
-  overflow-y: auto;
+/* Barra inferior: + a la izquierda, enviar a la derecha */
+.input-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px;
+  border-top: 1px solid rgba(148, 163, 184, 0.1);
 }
 
 .tool-menu {
   position: relative;
-  grid-column: 1;
-  grid-row: 2;
-  align-self: end;
   z-index: 300;
 }
 
 .tool-menu-btn {
-  width: 48px;
-  height: 48px;
+  width: 34px;
+  height: 34px;
   padding: 0;
-  border-radius: 14px;
-  font-size: 24px;
+  border-radius: 8px;
+  font-size: 20px;
   font-weight: bold;
+  background: transparent;
+  color: #94a3b8;
+  border: 1px solid transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.tool-menu-btn:hover {
+  background: rgba(51, 65, 85, 0.8);
+  color: #f8fafc;
 }
 
 .input-wrapper .tool-menu-btn {
   background: transparent;
-  width: 46px;
-  height: 46px;
-  color: #f8fafc;
+  color: #94a3b8;
 }
 
 .tool-menu-panel {
@@ -691,6 +693,36 @@ body {
   color: #fff;
 }
 
+/* ── Botón enviar ── */
+.send-btn {
+  grid-column: 3;
+  grid-row: 2;
+  align-self: end;
+  width: 36px !important;
+  height: 36px !important;
+  margin: 5px !important;
+  padding: 0 !important;
+  border-radius: 8px !important;
+  border: none !important;
+  background: #2563eb !important;
+  color: #ffffff !important;
+  cursor: pointer;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: background 0.15s ease, opacity 0.15s ease;
+  flex-shrink: 0;
+}
+
+.send-btn:hover:not(:disabled) {
+  background: #1d4ed8 !important;
+}
+
+.send-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed !important;
+}
+
 /* ── Responsive ── */
 @media (max-width: 640px) {
   .chat-app {
@@ -708,18 +740,6 @@ body {
 }
 
 /* ── Adjuntos ── */
-.attachment-preview {
-  grid-column: 1 / 3;
-  grid-row: 1;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding: 10px 12px;
-  border-bottom: 1px solid rgba(148, 163, 184, 0.14);
-  overflow-y: auto;
-  max-height: 120px;
-  height: auto;
-}
 
 .attachment-chip {
   display: flex;

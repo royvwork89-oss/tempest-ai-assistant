@@ -5,6 +5,7 @@ const {
   getAttachmentNames,
   cleanupFiles
 } = require('../services/attachment.service');
+const { detectMode } = require('../services/mode.router');
 
 function buildMemoryOptions(req) {
   return {
@@ -14,15 +15,16 @@ function buildMemoryOptions(req) {
   };
 }
 
-function isExplanationRequest(message) {
-  const text = message.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-  const triggers = [
-    'explicame', 'explica', 'que es', 'que son', 'como funciona',
-    'como funcionan', 'cuentame', 'describeme', 'describe',
-    'en que consiste', 'para que sirve', 'para que sirven',
-    'que significa', 'defineme', 'define '
-  ];
-  return triggers.some(t => text.includes(t));
+function buildPrefixedMessage(rawMessage, mode, variant) {
+  const base = rawMessage.trim() || 'Analiza los archivos adjuntos.';
+  if (mode === 'explain') {
+    return `Responde SOLO con texto explicativo, sin bloques de código. ${base}`;
+  }
+  if (mode === 'coder' && variant === 'hybrid') {
+    return `Explica brevemente en texto y luego entrega el código organizado por archivos. ${base}`;
+  }
+  // coder/strict y general no necesitan prefijo
+  return base;
 }
 
 async function chat(req, res) {
@@ -39,13 +41,18 @@ async function chat(req, res) {
     if (typeof config === 'string') {
       try { config = JSON.parse(config); } catch { config = {}; }
     }
+    console.log('[CONFIG]', { primaryModel: config.primaryModel, hardwareProfile: config.hardwareProfile, mode: config.mode });
 
     const rawTrimmed = rawMessage.trim();
-    const userMessage = rawTrimmed
-      ? (isExplanationRequest(rawTrimmed) && files.length === 0
-        ? `Responde SOLO con texto explicativo, sin código. ${rawTrimmed}`
-        : rawTrimmed)
-      : 'Analiza los archivos adjuntos.';
+    const { mode, variant, reason } = detectMode({
+      rawMessage: rawTrimmed,
+      files,
+      configMode: config.mode || null
+    });
+
+    console.log(`[MODE ROUTER] mode=${mode} variant=${variant} reason="${reason}"`);
+
+    const userMessage = buildPrefixedMessage(rawTrimmed, mode, variant);
     const memoryOptions = buildMemoryOptions(req);
 
     memory.detectUserData(userMessage, memoryOptions);
@@ -66,7 +73,8 @@ async function chat(req, res) {
     const streamOptions = {
       ...memoryOptions,
       primaryModel: config.primaryModel || 'hermes-q4',
-      hardwareProfile: config.hardwareProfile || 'laptop'
+      hardwareProfile: config.hardwareProfile || 'laptop',
+      mode
     };
 
     res.setHeader('Content-Type', 'text/event-stream');

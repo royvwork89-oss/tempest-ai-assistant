@@ -2,7 +2,7 @@
 
 ## 🚧 Estado actual
 
-Versión actual: **v1.0.0**
+Versión actual: **v1.1.0**
 
 Sistema funcional con:
 
@@ -23,12 +23,14 @@ Sistema funcional con:
 - Menú de herramientas (+)
 - Renderizado de bloques de código estilo terminal
 - **Separación automática de múltiples archivos en bloques individuales**
-- **Detección de intención** — responde con texto cuando se pide explicación, con código cuando se pide código
-- Botón para copiar código dentro de bloques
+- **Router de modos automático** — `coder/strict`, `coder/hybrid`, `explain`, `general` con heurística
+- **Botones de acción con íconos SVG** — sin texto, estilo Claude/ChatGPT, visibles al hacer hover
+- **Selección de texto sin capturar botones** — `user-select: none` en acciones
+- **Botón enviar con ícono de avión de papel** dentro del área de entrada
+- **Barra de herramientas fija** debajo del textarea (+ izquierda, enviar derecha)
 - Input multilínea con `Shift + Enter`
 - Textarea autoexpandible con límite de altura
 - Modo selección para eliminar múltiples chats independientes
-- Botones de acción por mensaje (copiar consulta, copiar respuesta, editar*, compartir*, reintentar*)
 - **Sistema de adjuntos completo:**
   - Drag & drop sobre chat y área de input
   - Chips visuales con preview de imágenes
@@ -45,9 +47,7 @@ Sistema funcional con:
 
 ---
 
-## 🎯 v1.0 — Uso diario real
-
-Tempest funciona como cualquier IA básica para investigar y programar sin problemas.
+## 🎯 v1.0 — Uso diario real ✅
 
 - [x] Streaming de respuesta (texto aparece palabra por palabra)
 - [x] Modal propio para renombrar — reemplazar el prompt() nativo por un modal visual
@@ -55,6 +55,16 @@ Tempest funciona como cualquier IA básica para investigar y programar sin probl
 - [x] Renombrar chat cuando el primer mensaje es solo archivo adjunto sin texto
 - [x] Validación de nombres para caracteres inválidos
 - [x] Manejo de errores visual — toast de sistema + burbuja de error en chat
+
+---
+
+## 🎯 v1.1 — Experiencia de uso mejorada ✅
+
+- [x] Router de modos automático — `coder/strict`, `coder/hybrid`, `explain`, `general`
+- [x] Botones de acción con íconos SVG estilo Claude/ChatGPT
+- [x] Acciones visibles solo al hacer hover, sin interferir con selección de texto
+- [x] Botón enviar con ícono de avión de papel dentro del área de entrada
+- [x] Barra de herramientas fija debajo del textarea (+ izquierda, enviar derecha)
 
 ---
 
@@ -72,12 +82,10 @@ Tempest funciona como cualquier IA básica para investigar y programar sin probl
 
 ### 💬 Acciones por mensaje
 
-- [ ] Reemplazar botón "Copiar" por ícono estilo ChatGPT/Claude
-- [ ] Mostrar opciones de acción (copiar, compartir, etc.) al seleccionar texto manualmente con el cursor
+- [ ] Mostrar opciones de acción al seleccionar texto manualmente con el cursor
 - [ ] Activar edición de consultas del usuario
 - [ ] Activar compartir respuestas
 - [ ] Activar intentar nuevamente en respuestas de Tempest
-- [ ] Mejorar diseño visual de acciones por mensaje
 
 ### 📎 Adjuntos — pendiente
 
@@ -154,12 +162,9 @@ Tempest funciona como cualquier IA básica para investigar y programar sin probl
 ## 🧑‍💻 Tempest como asistente de programación
 
 ### 🔀 Prioridad 1 — Enrutador de modelos y modos
-- [ ] Implementar router de modos: `coder` / `explain` / `general`
-- [ ] Heurística sin IA para detección automática de modo:
-  - palabras clave de implementación → modo coder
-  - palabras clave de explicación → modo explain
-  - archivos de código adjuntos → modo coder
-- [ ] Cada modo carga su modelo y su prompt automáticamente sin que el usuario elija
+- [x] Implementar router de modos: `coder` / `explain` / `general`
+- [x] Heurística automática para detección de modo (keywords + tipo de adjunto)
+- [ ] Cada modo carga su modelo automáticamente sin que el usuario elija
 
 ### 🧱 Prioridad 2 — System prompt por capas por proyecto
 - [ ] Capa 1: prompt base global (estilo, seguridad, formatos)
@@ -205,9 +210,9 @@ Tempest funciona como cualquier IA básica para investigar y programar sin probl
 
 ## 📁 Context files por proyecto
 
-- [ ] **Opción 1 — Subida manual desde la interfaz:** subir archivos `.md`, `.txt`, `.js`, etc. directamente desde Tempest, asociados a un proyecto, disponibles en todos sus chats sin adjuntarlos cada vez (similar a Project Knowledge de Claude/ChatGPT)
-- [ ] **Opción 2 — Lectura de carpeta del disco:** configurar una ruta local por proyecto (ej. `F:\Mis proyectos\IA\Tempest-ai-assistant\`), Tempest lee automáticamente los archivos de esa carpeta — siempre actualizado sin reemplazar nada manualmente
-- [ ] Pantalla de configuración inicial al crear proyecto — barra de mensaje + sección de context files + sección de ruta de carpeta (en lugar de ir directo al chat vacío)
+- [ ] **Opción 1 — Subida manual desde la interfaz:** subir archivos `.md`, `.txt`, `.js`, etc. directamente desde Tempest, asociados a un proyecto, disponibles en todos sus chats sin adjuntarlos cada vez
+- [ ] **Opción 2 — Lectura de carpeta del disco:** configurar una ruta local por proyecto, Tempest lee automáticamente los archivos de esa carpeta — siempre actualizado sin reemplazar nada manualmente
+- [ ] Pantalla de configuración inicial al crear proyecto — barra de mensaje + sección de context files + sección de ruta de carpeta
 
 ---
 
@@ -224,11 +229,12 @@ Tempest funciona como cualquier IA básica para investigar y programar sin probl
 - [ ] Probar `/title/generate`
 - [ ] Probar `/transcribe`
 - [ ] Probar adjuntos: PDF, DOCX, XLSX, TXT, código, imágenes
+- [ ] Probar router de modos: explain / coder strict / coder hybrid / general
 
 ---
+
 ## 🎯 v2.0 — Tempest como asistente de programación real
 
-- [ ] Router de modos: `coder` / `explain` / `general` con heurística automática
 - [ ] System prompt por capas por proyecto (global + proyecto + tarea)
 - [ ] Context Snapshot del repo — `projectContext.json` con archivos relevantes, hash/mtime
 - [ ] Patch Mode — cambios en formato diff en lugar de bloques completos

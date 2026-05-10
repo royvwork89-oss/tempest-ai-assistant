@@ -5,7 +5,7 @@
 Tempest es un asistente local de IA con arquitectura cliente-servidor, frontend web, backend Node.js/Express, motor LocalAI y persistencia basada en archivos JSON.
 
 ```text
-Usuario → Frontend → Backend → Memoria/Servicios → LocalAI → Backend (SSE) → Frontend
+Usuario → Frontend → Backend → Modo Router → Memoria/Servicios → LocalAI → Backend (SSE) → Frontend
 ```
 
 ---
@@ -24,9 +24,12 @@ Usuario → Frontend → Backend → Memoria/Servicios → LocalAI → Backend (
 - Comunicación HTTP con el backend mediante `fetch` / `FormData`.
 - **Streaming de respuesta** — `createStreamingBubble` crea burbuja vacía, `finalizeStreamingBubble` renderiza el resultado final con limpieza de stop tokens.
 - Renderizado de respuestas con acciones por mensaje.
+- **Botones de acción con íconos SVG** — visibles al hover, sin interferir con selección de texto.
 - Separación automática de múltiples archivos en bloques individuales.
 - Modo selección para eliminación múltiple de chats independientes.
 - Input multilínea autoexpandible.
+- **Área de entrada con flexbox** — textarea arriba, barra de herramientas fija abajo (+ izquierda, enviar derecha).
+- **Botón enviar con ícono de avión de papel** dentro del área de entrada.
 - Validación de nombres de chats y proyectos.
 
 ### Backend
@@ -34,7 +37,7 @@ Usuario → Frontend → Backend → Memoria/Servicios → LocalAI → Backend (
 - API REST con Express.
 - Controladores para chat y transcripción.
 - **Streaming SSE** en `chat.controller.js` — usa `Content-Type: text/event-stream` y reenvía tokens con `res.write()`.
-- Detección de intención en `chat.controller.js`.
+- **Router de modos** en `services/mode.router.js` — detecta `coder/strict`, `coder/hybrid`, `explain`, `general`.
 - Servicios separados para LocalAI, memoria, transcripción y adjuntos.
 - Persistencia por archivos JSON.
 - Endpoints para crear, listar, renombrar y eliminar chats/proyectos.
@@ -48,6 +51,33 @@ Usuario → Frontend → Backend → Memoria/Servicios → LocalAI → Backend (
 - `streamToLocalAI` — AsyncGenerator que hace `yield` de cada token recibido.
 - Modelo Whisper vía LocalAI para transcripción de audio.
 - Generación auxiliar de títulos cortos para chats (sin stream, `max_tokens: 12`).
+
+---
+
+## 🎯 Router de modos
+
+```text
+chat.controller.js
+↓ detectMode({ rawMessage, files, configMode })
+↓
+services/mode.router.js
+↓ { mode, variant, reason }
+↓
+chat.controller.js
+↓ buildPrefixedMessage(rawMessage, mode, variant)
+↓ streamOptions.mode = mode
+↓
+localai.service.js
+↓ getMaxTokens(model, message, options.mode, hardwareProfile)
+```
+
+### Modos
+| Modo | Variant | Comportamiento |
+|------|---------|----------------|
+| `coder` | `strict` | Solo código, tokens máximos |
+| `coder` | `hybrid` | Explicación breve + código |
+| `explain` | `null` | Solo texto, tokens normales |
+| `general` | `null` | Sin modificación |
 
 ---
 
@@ -77,7 +107,7 @@ frontend/api.js  ← FormData cuando hay archivos, JSON cuando no
 ↓
 backend/routes/chat.routes.js  ← multer recibe hasta 8 archivos en uploads/attachments/
 ↓
-backend/controllers/chat.controller.js  ← detecta intención, llama a buildAttachmentContext
+backend/controllers/chat.controller.js  ← detectMode, buildAttachmentContext
 ↓
 backend/services/attachment.service.js  ← extracción de texto por tipo
 ↓
@@ -94,17 +124,6 @@ prompt inyectado a LocalAI como bloque --- ARCHIVOS ADJUNTOS ---
 | TXT/código | fs.readFile | truncado inteligente preservando cabecera e imports |
 | Imágenes | — | placeholder con metadata, sin análisis visual |
 
-### Truncado inteligente
-
-- **Código**: 60% cabecera + 30% final, límite 7500 chars
-- **Documentos**: 65% inicio + 25% final, límite 7500 chars
-- Aviso de truncado incluido en el texto enviado al modelo
-
-### Limpieza de temporales
-
-- **Capa A**: `finally` en el controller tras cada request
-- **Capa B**: `setInterval` cada 6h en `server.js` borra archivos con más de 24h
-
 ---
 
 ## 🌊 Sistema de streaming
@@ -120,12 +139,15 @@ api.js → fetch POST /chat
 ↓ onToken(token) → rawEl.textContent += token
 ↓
 backend/controllers/chat.controller.js
+↓ detectMode → mode/variant/reason
+↓ buildPrefixedMessage → userMessage
 ↓ res.setHeader('Content-Type', 'text/event-stream')
 ↓ for await (token of streamToLocalAI(...))
 ↓ res.write(`data: ${JSON.stringify(token)}\n\n`)
 ↓
 services/localai.service.js → streamToLocalAI (async generator)
 ↓ fetch LocalAI con stream: true
+↓ getMaxTokens con options.mode
 ↓ ReadableStream → yield token
 ↓
 LocalAI genera tokens individuales
@@ -136,10 +158,6 @@ frontend: finalizeStreamingBubble(bubble, rawEl, fullText)
 ↓ limpia stop tokens con regex /<\|...\|>/g
 ↓ renderMixedContent → bloques de código, links, acciones
 ```
-
-### Limpieza de stop tokens de Hermes
-
-Los modelos Hermes emiten tokens especiales (`<|im_end|>`, `<|end_of_text|>`, etc.) letra por letra durante el stream. Como llegan separados el regex no los detecta en tiempo real. La solución es limpiarlos en `finalizeStreamingBubble` sobre el `fullText` acumulado antes de renderizar el resultado final.
 
 ---
 
@@ -177,6 +195,7 @@ Tempest/
 │   │   │   ├── response.validator.js
 │   │   │   └── token.profiles.js
 │   │   ├── memory.service.js
+│   │   ├── mode.router.js          ← NUEVO
 │   │   └── transcription.service.js
 │   ├── uploads/
 │   │   ├── attachments/
@@ -205,54 +224,6 @@ Tempest/
     ├── hermes-q4.yaml
     ├── hermes-q5.yaml
     └── hermes-q6.yaml
-```
-
----
-
-## 🔄 Flujo interno de chat
-
-```text
-frontend/app.js
-↓ createStreamingBubble
-↓
-api.js → POST /chat (FormData o JSON)
-↓
-routes/chat.routes.js (multer)
-↓
-controllers/chat.controller.js
-↓ (detecta intención: explicación vs código)
-↓ (si hay adjuntos)
-services/attachment.service.js → buildAttachmentContext
-↓
-services/localai.service.js → streamToLocalAI
-↓
-services/memory.service.js
-↓
-LocalAI (stream: true)
-↓
-tokens → SSE → frontend rawEl.textContent
-↓
-Respuesta completa guardada en chatHistory
-↓
-cleanupFiles (Capa A)
-↓
-finalizeStreamingBubble → renderMixedContent
-```
-
----
-
-## 🧭 Sidebar y organización visual
-
-```text
-+ Nuevo Chat
-chat independiente
-chat independiente
-
-+ Nuevo Proyecto
-▸ proyecto cerrado
-▾ proyecto abierto
-   + Nuevo chat
-   chat del proyecto
 ```
 
 ---
