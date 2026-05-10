@@ -39,6 +39,7 @@ Sistema funcional con:
 - **Historial de conversación corregido** (sin duplicados)
 - **Modelos Q4, Q5 y Q6 funcionando**
 - **Streaming de respuesta** — texto aparece palabra por palabra mientras LocalAI genera
+- **Manejo de errores visual** — toast de sistema + burbuja de error en chat
 
 *preparado para futuro
 
@@ -53,7 +54,7 @@ Tempest funciona como cualquier IA básica para investigar y programar sin probl
 - [x] Mejorar prompt del generador de títulos — más rápido y preciso
 - [x] Renombrar chat cuando el primer mensaje es solo archivo adjunto sin texto
 - [x] Validación de nombres para caracteres inválidos
-- [ ] Manejo de errores visual
+- [x] Manejo de errores visual — toast de sistema + burbuja de error en chat
 
 ---
 
@@ -102,7 +103,6 @@ Tempest funciona como cualquier IA básica para investigar y programar sin probl
 
 ### 🧾 UI/UX
 
-- [ ] Añadir modal de error visual
 - [ ] Añadir loader animado de respuesta
 - [ ] Añadir confirmación visual al renombrar
 - [ ] Mejorar diseño móvil
@@ -151,10 +151,63 @@ Tempest funciona como cualquier IA básica para investigar y programar sin probl
 
 ---
 
-## 🎯 v1.0 — Uso diario real
+## 🧑‍💻 Tempest como asistente de programación
 
-Tempest funciona como cualquier IA básica para investigar y programar sin problemas.
-- [ ] Manejo de errores visual
+### 🔀 Prioridad 1 — Enrutador de modelos y modos
+- [ ] Implementar router de modos: `coder` / `explain` / `general`
+- [ ] Heurística sin IA para detección automática de modo:
+  - palabras clave de implementación → modo coder
+  - palabras clave de explicación → modo explain
+  - archivos de código adjuntos → modo coder
+- [ ] Cada modo carga su modelo y su prompt automáticamente sin que el usuario elija
+
+### 🧱 Prioridad 2 — System prompt por capas por proyecto
+- [ ] Capa 1: prompt base global (estilo, seguridad, formatos)
+- [ ] Capa 2: prompt de proyecto (stack: Node/Express, React, Python, etc.) — configurable por proyecto
+- [ ] Capa 3: prompt de tarea (coder/explain/general) — inyectado por el router
+- [ ] UI para editar el prompt de proyecto desde la pantalla de configuración del proyecto
+
+### 📸 Prioridad 3 — Context Snapshot del repo
+- [ ] Generar `projectContext.json` por proyecto con extracto truncado de archivos relevantes
+- [ ] Filtrar por extensión (js, ts, py, json, md, etc.) y archivos clave (README, package.json, routes, controllers, services)
+- [ ] Usar hash/mtime para refrescar solo archivos que cambiaron
+- [ ] Subir al contexto archivos mencionados explícitamente por el usuario
+- [ ] Incluir top N archivos tocados recientemente
+
+### 🩹 Prioridad 4 — Patch Mode para cambios de código
+- [ ] Tempest responde cambios en formato diff/patch en lugar de bloques completos
+- [ ] Formato: archivo + línea anterior + línea nueva
+- [ ] Reducir errores al aplicar cambios en archivos grandes
+
+### 🤖 Modelos recomendados para programación
+- [ ] DeepSeek-Coder 6.7B — modelo default para código diario (rápido)
+- [ ] Qwen2.5-Coder 14B — modo calidad/arquitectura
+- [ ] CodeLlama 13B — backup/comparación
+- [ ] Router elige modelo automáticamente según modo detectado
+
+### 🔮 Para después
+- Embeddings y búsqueda semántica del repo
+- Decisiones técnicas generadas automáticamente por Tempest
+- Visión real en imágenes de código/diagramas
+
+---
+
+## 📬 Integración de correo (Outlook)
+
+- [ ] Registrar app en Azure Portal y configurar OAuth 2.0 con Microsoft Graph API
+- [ ] Flujo de autenticación — abre navegador una vez, guarda token para sesiones futuras
+- [ ] Leer correos no leídos desde el chat ("muéstrame los últimos 10 correos")
+- [ ] Resumir correos con LocalAI
+- [ ] Responder correos desde el chat
+- [ ] Organizar correos — mover a carpetas desde el chat
+
+---
+
+## 📁 Context files por proyecto
+
+- [ ] **Opción 1 — Subida manual desde la interfaz:** subir archivos `.md`, `.txt`, `.js`, etc. directamente desde Tempest, asociados a un proyecto, disponibles en todos sus chats sin adjuntarlos cada vez (similar a Project Knowledge de Claude/ChatGPT)
+- [ ] **Opción 2 — Lectura de carpeta del disco:** configurar una ruta local por proyecto (ej. `F:\Mis proyectos\IA\Tempest-ai-assistant\`), Tempest lee automáticamente los archivos de esa carpeta — siempre actualizado sin reemplazar nada manualmente
+- [ ] Pantalla de configuración inicial al crear proyecto — barra de mensaje + sección de context files + sección de ruta de carpeta (en lugar de ir directo al chat vacío)
 
 ---
 
@@ -173,10 +226,24 @@ Tempest funciona como cualquier IA básica para investigar y programar sin probl
 - [ ] Probar adjuntos: PDF, DOCX, XLSX, TXT, código, imágenes
 
 ---
+## 🎯 v2.0 — Tempest como asistente de programación real
+
+- [ ] Router de modos: `coder` / `explain` / `general` con heurística automática
+- [ ] System prompt por capas por proyecto (global + proyecto + tarea)
+- [ ] Context Snapshot del repo — `projectContext.json` con archivos relevantes, hash/mtime
+- [ ] Patch Mode — cambios en formato diff en lugar de bloques completos
+- [ ] DeepSeek-Coder 6.7B como modelo default para código diario
+- [ ] Qwen2.5-Coder 14B para modo calidad/arquitectura
+- [ ] CodeLlama 13B como backup/comparación
+- [ ] Router elige modelo automáticamente según modo detectado
+- [ ] Context files por proyecto — subida manual + lectura de carpeta del disco
+- [ ] Pantalla de configuración inicial al crear proyecto
+
+---
 
 ## 🔮 vX.x
+
 - [ ] Lectura de PPTX (extracción XML de ZIP)
-- [ ] Configurar modelo especializado en código (Qwen2.5-Coder-14B) como opción en el menú
 - [ ] Añadir respaldo/exportación de memoria
 - [ ] LibreOffice headless para extracción de documentos de alta fidelidad
 - [ ] Función de voz al chat: hablar → texto → consulta
@@ -187,6 +254,4 @@ Tempest funciona como cualquier IA básica para investigar y programar sin probl
 - [ ] Añadir búsqueda semántica con embeddings
 - [ ] Añadir app desktop con Electron
 - [ ] Añadir sincronización opcional
-- [ ] Añadir respaldo/exportación de memoria
 - [ ] Integración de correo Outlook (Microsoft Graph API + OAuth 2.0)
-- [ ] Context files por proyecto — subida manual + lectura de carpeta del disco + pantalla de configuración inicial
