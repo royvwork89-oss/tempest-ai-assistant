@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { extractPptx } = require('./attachment/extractors/pptx.extractor');
 
 // ─── Configuración ────────────────────────────────────────────────────────────
 
@@ -18,6 +19,8 @@ const ALLOWED_MIMETYPES = new Set([
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'application/vnd.ms-powerpoint',
   'image/png',
   'image/jpeg',
   'image/gif',
@@ -29,7 +32,7 @@ const ALLOWED_EXTENSIONS = new Set([
   '.json', '.yaml', '.yml', '.xml', '.csv', '.py', '.java',
   '.c', '.cpp', '.h', '.cs', '.php', '.rb', '.go', '.rs',
   '.sh', '.bash', '.env', '.ini', '.toml', '.sql',
-  '.pdf', '.docx', '.xlsx',
+  '.pdf', '.docx', '.xlsx', '.pptx',
   '.png', '.jpg', '.jpeg', '.gif', '.webp'
 ]);
 
@@ -238,6 +241,13 @@ if (ext === '.xlsx') {
     };
   }
 }
+
+// PPTX
+  if (ext === '.pptx') {
+    return extractPptx(file, { includeNotes: true }, (raw) =>
+      truncateDocument(raw, MAX_CHARS)
+    );
+  }
 
   // Texto plano / código
   if (TEXT_EXTENSIONS.has(ext)) {

@@ -10,17 +10,19 @@
 6. Backend llama a `detectMode({ rawMessage, files, configMode })`.
 7. `mode.router.js` evalúa heurística y devuelve `{ mode, variant, reason }`.
 8. Backend loguea: `[MODE ROUTER] mode=X variant=Y reason="Z"`.
-9. `buildPrefixedMessage` aplica prefijo según modo y variante.
-10. Backend construye contexto y llama a `streamToLocalAI` con `options.mode`.
-11. `getMaxTokens` asigna presupuesto de tokens según modo.
-12. Backend abre conexión SSE (`Content-Type: text/event-stream`).
-13. LocalAI genera tokens uno por uno con `stream: true`.
-14. Cada token llega al backend → se reenvía al frontend con `res.write()`.
-15. Frontend recibe cada token vía `ReadableStream` → `onToken` lo agrega a `rawEl.textContent`.
-16. Al terminar el stream, backend envía `[DONE]` con metadata de adjuntos.
-17. `finalizeStreamingBubble` reemplaza el texto plano por el renderizado final.
-18. Backend guarda la respuesta completa en `chatHistory`.
-19. Frontend dispara renombrado automático si es el primer mensaje.
+9. `buildPrefixedMessage` construye `finalMessage` con prefijo según modo → va al modelo.
+10. `rawTrimmed + attachmentContext` construye `historialMessage` sin prefijo → se guarda en memoria.
+11. `detectUserData` recibe el mensaje limpio del usuario.
+12. Backend llama a `streamToLocalAI` con `finalMessage` y `options.mode`.
+13. `getMaxTokens` asigna presupuesto de tokens según modo.
+14. Backend abre conexión SSE (`Content-Type: text/event-stream`).
+15. LocalAI genera tokens uno por uno con `stream: true`.
+16. Cada token llega al backend → se reenvía al frontend con `res.write()`.
+17. Frontend recibe cada token vía `ReadableStream` → `onToken` lo agrega a `rawEl.textContent`.
+18. Al terminar el stream, backend envía `[DONE]` con metadata de adjuntos.
+19. `finalizeStreamingBubble` limpia stop tokens y prefijos filtrados (airbag visual), luego renderiza.
+20. Backend guarda `historialMessage` limpio en `chatHistory`.
+21. Frontend dispara renombrado automático si es el primer mensaje.
 
 ---
 
@@ -49,8 +51,33 @@ buildPrefixedMessage:
   hybrid     → "Explica brevemente y luego entrega el código... {mensaje}"
   strict/general → mensaje sin modificar
 ↓
+finalMessage (con prefijo) → streamToLocalAI
+historialMessage (sin prefijo) → memory.addChatHistoryMessage
 streamOptions.mode = mode → getMaxTokens usa mode para tokens
 ```
+
+---
+
+## 🧹 Flujo de sanitización de salida del modelo
+
+```text
+LocalAI genera respuesta (streaming o completa)
+↓
+Backend: cleanReply(text) → llama sanitizeModelOutput(text)
+  - elimina stop tokens de Hermes
+  - elimina prefijos internos filtrados (si aparecen al final)
+  - elimina ruido del modelo (^assistant, ^:)
+  - normaliza whitespace
+↓
+Backend guarda respuesta limpia en chatHistory
+↓
+Frontend: finalizeStreamingBubble recibe fullText acumulado durante stream
+  - aplica VISUAL_STOP_TOKENS (airbag independiente)
+  - aplica stripLeakedInstructions (airbag visual)
+  - renderMixedContent → renderizado final
+```
+
+El frontend mantiene su propio airbag porque renderiza durante el stream, antes de que backend procese y guarde en historial.
 
 ---
 
@@ -61,13 +88,14 @@ streamOptions.mode = mode → getMaxTokens usa mode para tokens
 3. Al enviar, `api.js` construye un `FormData` con el mensaje y los archivos.
 4. Backend recibe la petición via multer, guarda temporales en `uploads/attachments/`.
 5. `detectMode` evalúa tipo de adjunto + texto para determinar modo.
-6. `attachment.service.js` extrae texto según tipo (pdf2json / mammoth / xlsx / readFile / placeholder).
-7. El texto se trunca inteligentemente según tipo.
-8. Se construye el bloque `--- ARCHIVOS ADJUNTOS ---` y se inyecta al prompt.
-9. `chatHistory` guarda el mensaje completo con el bloque de adjuntos.
-10. LocalAI recibe el contexto completo y responde vía streaming.
-11. Bloque `finally`: `cleanupFiles` elimina los temporales (Capa A).
-12. Frontend renderiza la respuesta final.
+6. `attachment.service.js` valida cada archivo (mimetype + extensión + magic bytes).
+7. Para PPTX, delega a `attachment/extractors/pptx.extractor.js`.
+8. El texto se trunca inteligentemente según tipo.
+9. Se construye el bloque `--- ARCHIVOS ADJUNTOS ---` y se inyecta al `finalMessage`.
+10. `historialMessage` guarda el contenido del adjunto sin el prefijo de instrucción.
+11. LocalAI recibe el contexto completo y responde vía streaming.
+12. Bloque `finally`: `cleanupFiles` elimina los temporales (Capa A).
+13. Frontend renderiza la respuesta final.
 
 ---
 
@@ -76,8 +104,8 @@ streamOptions.mode = mode → getMaxTokens usa mode para tokens
 1. Frontend envía `userId`, `projectId` y `chatId`.
 2. Backend localiza memoria global, de proyecto y de chat.
 3. Se construye contexto.
-4. Se consulta LocalAI vía stream.
-5. Se actualiza `chatHistory` con la respuesta completa al terminar el stream.
+4. Se consulta LocalAI vía stream con `finalMessage`.
+5. Se actualiza `chatHistory` con `historialMessage` limpio al terminar el stream.
 
 ---
 
@@ -137,17 +165,6 @@ streamOptions.mode = mode → getMaxTokens usa mode para tokens
 
 ---
 
-## 💬 Flujo de acciones por mensaje
-
-1. Usuario hace hover sobre un mensaje.
-2. `.message-actions` pasa de `opacity: 0` a `opacity: 1`.
-3. Usuario hace clic en ícono de copiar.
-4. `navigator.clipboard.writeText(text)` copia el contenido.
-5. Ícono cambia a checkmark durante 1.5s y vuelve al original.
-6. Si el usuario selecciona texto manualmente, los botones no se incluyen en la selección (`user-select: none`).
-
----
-
 ## 🎙️ Flujo de transcripción de audio
 
 1. Usuario abre menú de herramientas (+).
@@ -174,6 +191,7 @@ streamOptions.mode = mode → getMaxTokens usa mode para tokens
 **Capa B — job escoba:**
 - `server.js` ejecuta `setInterval` cada 6 horas.
 - Recorre `uploads/attachments/` y elimina archivos con más de 24h de antigüedad.
+- Actúa como red de seguridad si la Capa A falla.
 
 ---
 
@@ -189,9 +207,10 @@ api.js → POST /chat (JSON o FormData)
 ↓
 backend/controllers/chat.controller.js
 ↓ detectMode → { mode, variant, reason }
-↓ buildPrefixedMessage → userMessage con prefijo según variant
+↓ buildPrefixedMessage → finalMessage (con prefijo, al modelo)
+↓ rawTrimmed + attachmentContext → historialMessage (sin prefijo, a memoria)
 ↓ res.setHeader('Content-Type', 'text/event-stream')
-↓ for await (token of streamToLocalAI)
+↓ for await (token of streamToLocalAI(finalMessage, ...))
 ↓ res.write(`data: ${JSON.stringify(token)}\n\n`)
 ↓
 services/localai.service.js → streamToLocalAI (AsyncGenerator)
@@ -203,7 +222,10 @@ LocalAI genera tokens individuales
 ↓
 Al terminar: res.write('[DONE] {...}') → res.end()
 ↓
-frontend: finalizeStreamingBubble → renderMixedContent con limpieza de stop tokens
+frontend: finalizeStreamingBubble
+↓ VISUAL_STOP_TOKENS regex → limpia stop tokens
+↓ stripLeakedInstructions → airbag visual para prefijos filtrados
+↓ renderMixedContent → bloques de código, links, acciones
 ```
 
 ---
@@ -218,5 +240,8 @@ frontend: finalizeStreamingBubble → renderMixedContent con limpieza de stop to
 - Nombre de chat/proyecto con caracteres inválidos (mostrado inline en modal).
 - Nombre demasiado corto o largo.
 - Archivo con mimetype o extensión no permitida.
-- Error de extracción de texto (PDF corrupto, DOCX dañado, etc.).
+- Magic bytes inválidos (PDF, ZIP/PPTX).
+- Error de extracción de texto (PDF corrupto, DOCX dañado, PPTX con slide rota, etc.).
 - Error en stream: si los headers SSE ya se enviaron, se escribe `[ERROR]` y se cierra la conexión.
+- Toast de sistema para errores de conexión.
+- Burbuja de error en chat para errores contextuales.

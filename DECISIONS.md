@@ -152,13 +152,13 @@ Mayor privacidad, mayor carga técnica, requiere limpieza de temporales.
 ## 📎 Sistema de adjuntos con extracción de texto
 
 ### Decisión
-Extraer texto de los archivos adjuntos en el backend e inyectarlo al prompt como contexto plano.
+Extraer texto de los archivos adjuntos en el backend e inyectarlo al prompt como contexto plano, en lugar de enviar el archivo directamente a LocalAI.
 
 ### Razón
 LocalAI solo recibe texto. No puede procesar archivos binarios directamente.
 
 ### Impacto
-LocalAI puede "leer" documentos sin soporte nativo de archivos.
+LocalAI puede "leer" documentos sin soporte nativo de archivos. Diferencia entre calidad de extracción según tipo de archivo.
 
 ---
 
@@ -168,6 +168,7 @@ LocalAI puede "leer" documentos sin soporte nativo de archivos.
 - **PDF**: `pdf2json` — descartados `pdf-parse` y `pdfjs-dist` por bugs.
 - **DOCX**: `mammoth` — extracción limpia de texto plano.
 - **XLSX**: `xlsx` — conversión por hoja a CSV etiquetado.
+- **PPTX**: `unzipper` + parseo XML — extractor modular en `attachment/extractors/`.
 - **Imágenes**: placeholder con metadata.
 
 ---
@@ -199,6 +200,33 @@ Permite preguntas de seguimiento con acceso al contenido del archivo.
 
 ---
 
+## 📎 Extractor PPTX con arquitectura modular
+
+### Decisión
+Crear `backend/services/attachment/extractors/pptx.extractor.js` como módulo independiente en lugar de agregar el caso directamente en `attachment.service.js`.
+
+### Razón
+Separación de responsabilidades. `attachment.service.js` actúa como orquestador; cada formato complejo tiene su propio extractor. Escalable para agregar PPT legacy, LibreOffice headless, etc.
+
+### Contrato de salida
+Todos los extractores devuelven `{ name, type, content, truncated, original, meta? }`. El campo `meta` permite datos específicos del tipo (ej. `{ slides: 18, hasNotes: true }` para PPTX).
+
+### PPTX — implementación
+- Valida magic bytes ZIP (`PK 0x50 0x4B`) antes de parsear.
+- Extrae texto de `ppt/slides/slideN.xml` ordenado por número de slide.
+- Extrae notas del presentador de `ppt/notesSlides/notesSlideN.xml` (default ON, configurable).
+- Formatea tablas (`<a:tbl>`) con separadores `|`; fallback a texto plano si falla.
+- Tolerancia a fallos por slide: si una diapositiva falla, continúa con las demás.
+- Reutiliza `truncateDocument` de `attachment.service.js` sin duplicar lógica.
+
+### Migración incremental
+Los extractores existentes (PDF, DOCX, XLSX) permanecen en `attachment.service.js` hasta que haya una razón real para moverlos. No big bang.
+
+### Impacto
+Base preparada para agregar `pdf.extractor.js`, `docx.extractor.js`, etc. en el futuro.
+
+---
+
 ## 🤖 Modelos Q4, Q5 y Q6
 
 ### Decisión
@@ -212,7 +240,7 @@ Soportar tres perfiles de calidad de modelo GGUF: Q4 (rápido), Q5 (equilibrado)
 Crear `services/mode.router.js` como módulo independiente que detecta el modo de respuesta por mensaje.
 
 ### Razón
-La detección binaria anterior (explicación vs código) no cubría casos mixtos ni adjuntos no-código. Separar la lógica en su propio archivo permite testearla, extenderla y leerla de forma independiente sin tocar el controller.
+La detección binaria anterior no cubría casos mixtos ni adjuntos no-código. Separar la lógica en su propio archivo permite testearla y extenderla sin tocar el controller.
 
 ### Arquitectura
 - `mode.router.js` — `detectMode({ rawMessage, files, configMode })` → `{ mode, variant, reason }`
@@ -231,31 +259,15 @@ La detección binaria anterior (explicación vs código) no cubría casos mixtos
 8. Solo trigger de código → `coder/strict`
 9. Default → `general`
 
-### Submodos internos (variant)
-- `strict` — solo código/archivos, sin explicación
-- `hybrid` — explicación breve + código
-- `null` — sin modificación al mensaje
-
-### Texto default del frontend
-El mensaje `"Analiza los archivos adjuntos."` que manda el frontend cuando no hay texto escrito se trata como texto vacío en el router para no interferir con la detección por tipo de adjunto.
-
-### Log
-```
-[MODE ROUTER] mode=coder variant=hybrid reason="trigger mixto: explicación + código explícito"
-```
-
 ### Impacto
-Respuestas más precisas según intención. Tokens ajustados automáticamente al modo. Sin `confidence` — se agrega cuando haya datos reales para calibrarlo.
+Respuestas más precisas según intención. Tokens ajustados automáticamente al modo.
 
 ---
 
 ## 💬 Íconos SVG en botones de acción
 
 ### Decisión
-Reemplazar texto ("Copiar", "Editar", "Compartir") por íconos SVG inline en los botones de acción por mensaje y en el botón de copiar de bloques de código.
-
-### Razón
-Consistencia visual con Claude y ChatGPT. Menos espacio ocupado. Mejor experiencia en hover.
+Reemplazar texto por íconos SVG inline en los botones de acción por mensaje y en el botón de copiar de bloques de código.
 
 ### Impacto
 - Botones visibles solo al hacer hover sobre el mensaje (`opacity: 0` → `opacity: 1`).
@@ -269,9 +281,6 @@ Consistencia visual con Claude y ChatGPT. Menos espacio ocupado. Mejor experienc
 ### Decisión
 Cambiar el layout del input de grid a flexbox con dos secciones: textarea arriba, barra de herramientas abajo.
 
-### Razón
-El grid anterior causaba que el botón de enviar se desplazara o quedara invisible al crecer el textarea. La barra inferior con flexbox `justify-content: space-between` mantiene `+` a la izquierda y enviar a la derecha siempre visibles.
-
 ### Estructura
 ```
 ┌─────────────────────────────────┐
@@ -281,11 +290,6 @@ El grid anterior causaba que el botón de enviar se desplazara o quedara invisib
 │  [+]              [➤ enviar]    │
 └─────────────────────────────────┘
 ```
-
-### Botón enviar
-- Ícono avión de papel (SVG `fill="currentColor"`).
-- Siempre visible en la barra inferior.
-- Color azul `#2563eb`, hover `#1d4ed8`.
 
 ### Impacto
 Layout estable sin importar el tamaño del texto. Botones siempre accesibles.
@@ -297,21 +301,61 @@ Layout estable sin importar el tamaño del texto. Botones siempre accesibles.
 ### Decisión
 Implementar streaming de respuesta usando Server-Sent Events (SSE) en el backend y `ReadableStream` en el frontend.
 
-### Razón
-Sin streaming el usuario espera en silencio hasta que LocalAI termina de generar toda la respuesta.
-
 ### Problema resuelto: tokens especiales de Hermes
-LocalAI con modelos Hermes envía tokens especiales letra por letra. La solución fue limpiarlos en `finalizeStreamingBubble` sobre el `fullText` acumulado.
+LocalAI con modelos Hermes envía tokens especiales letra por letra. La solución fue limpiarlos en `finalizeStreamingBubble` sobre el `fullText` acumulado, usando `sanitize.js` como fuente de verdad.
 
 ### Impacto
-Experiencia de usuario significativamente mejor.
+Experiencia de usuario significativamente mejor. El texto aparece de forma progresiva.
+
+---
+
+## 🧹 sanitize.js — capa centralizada de post-procesado
+
+### Decisión
+Crear `backend/utils/sanitize.js` con `sanitizeModelOutput(text, options?)` como función pura sin dependencias externas.
+
+### Razón
+`cleanReply.js` y `finalizeStreamingBubble` duplicaban la limpieza de stop tokens de Hermes. Sin un punto centralizado, cada nuevo tipo de basura del modelo requería cambios en múltiples archivos.
+
+### Arquitectura
+- `sanitize.js`: fuente de verdad — stop tokens, prefijos internos filtrados, ruido del modelo, normalización whitespace.
+- `cleanReply.js`: wrapper legacy que llama `sanitizeModelOutput()` para mantener compatibilidad con todo lo que ya lo importa.
+- `ui.js`: airbag visual independiente — no confía ciegamente en backend porque el frontend renderiza durante el stream, antes de que backend guarde en historial.
+
+### Opciones
+```js
+sanitizeModelOutput(text, {
+  stripStopTokens: true,           // <|im_end|>, <|eot_id|>, etc.
+  stripInternalInstructions: true, // prefijos filtrados al final del texto
+  stripModelNoise: true,           // "assistant", ":" al inicio
+  normalizeWhitespace: true        // trim
+})
+```
+
+### Impacto
+Un solo lugar para agregar nuevos patrones de limpieza. Reutilizable en tests, Electron, o cualquier superficie futura.
+
+---
+
+## 🔒 Separación mensaje al modelo vs mensaje al historial
+
+### Decisión
+En `chat.controller.js`, separar `finalMessage` (con prefijo de instrucción, va al modelo) de `historialMessage` (sin prefijo, se guarda en memoria). `detectUserData` también recibe el mensaje limpio.
+
+### Razón
+El prefijo interno (`"Responde SOLO con texto explicativo..."`) se guardaba en `chatHistory`. El modelo lo veía reciclado en cada turno siguiente, aprendiendo a repetirlo en sus respuestas. Además `detectUserData` recibía texto contaminado con instrucciones internas.
+
+### Impacto
+- Historial limpio: el modelo no ve prefijos internos en conversaciones anteriores.
+- `detectUserData` recibe solo el mensaje real del usuario.
+- El airbag visual en frontend actúa como segunda capa de defensa para casos donde el modelo igual repita algo.
 
 ---
 
 ## 🔮 Decisiones futuras
 
-- Implementar PPTX con extracción XML de ZIP.
-- Implementar LibreOffice headless desde Node.
+- Implementar LibreOffice headless desde Node para mejor calidad de extracción.
+- Orden real de slides PPTX leyendo `ppt/presentation.xml` (v2 del extractor).
 - **Modo híbrido de modelos:** LocalAI con Qwen2.5-Coder-14B para código rutinario, Claude API / OpenAI API para arquitectura compleja.
 - Migrar memoria JSON a base de datos.
 - Añadir login real.

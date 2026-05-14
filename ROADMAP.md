@@ -2,7 +2,7 @@
 
 ## 🚧 Estado actual
 
-Versión actual: **v1.1.0**
+Versión actual: **v1.2.0**
 
 Sistema funcional con:
 
@@ -34,27 +34,30 @@ Sistema funcional con:
 - **Sistema de adjuntos completo:**
   - Drag & drop sobre chat y área de input
   - Chips visuales con preview de imágenes
-  - PDF (pdf2json), DOCX (mammoth), XLSX (xlsx), TXT, código, imágenes
+  - PDF (pdf2json), DOCX (mammoth), XLSX (xlsx), **PPTX (unzipper + XML)**, TXT, código, imágenes
+  - Extractor PPTX modular con notas del presentador, tablas y tolerancia a fallos por slide
   - Truncado inteligente por tipo
   - Limpieza automática doble capa
   - Contexto inyectado al prompt de LocalAI
+  - Arquitectura de extractores con contrato estándar `{ name, type, content, truncated, original, meta? }`
+- **sanitize.js** — capa centralizada de post-procesado de salidas del modelo (función pura)
+- **Historial limpio** — prefijos internos de instrucción no se guardan en `chatHistory`
+- **Airbag visual en frontend** — capa independiente de limpieza en `finalizeStreamingBubble`
 - **Historial de conversación corregido** (sin duplicados)
 - **Modelos Q4, Q5 y Q6 funcionando**
 - **Streaming de respuesta** — texto aparece palabra por palabra mientras LocalAI genera
 - **Manejo de errores visual** — toast de sistema + burbuja de error en chat
-
-*preparado para futuro
 
 ---
 
 ## 🎯 v1.0 — Uso diario real ✅
 
 - [x] Streaming de respuesta (texto aparece palabra por palabra)
-- [x] Modal propio para renombrar — reemplazar el prompt() nativo por un modal visual
-- [x] Mejorar prompt del generador de títulos — más rápido y preciso
+- [x] Modal propio para renombrar
+- [x] Mejorar prompt del generador de títulos
 - [x] Renombrar chat cuando el primer mensaje es solo archivo adjunto sin texto
 - [x] Validación de nombres para caracteres inválidos
-- [x] Manejo de errores visual — toast de sistema + burbuja de error en chat
+- [x] Manejo de errores visual
 
 ---
 
@@ -64,7 +67,16 @@ Sistema funcional con:
 - [x] Botones de acción con íconos SVG estilo Claude/ChatGPT
 - [x] Acciones visibles solo al hacer hover, sin interferir con selección de texto
 - [x] Botón enviar con ícono de avión de papel dentro del área de entrada
-- [x] Barra de herramientas fija debajo del textarea (+ izquierda, enviar derecha)
+- [x] Barra de herramientas fija debajo del textarea
+
+---
+
+## 🎯 v1.2 — Adjuntos completos + sanitización ✅
+
+- [x] Lectura de PPTX (extractor modular, unzipper + XML, notas del presentador, tablas)
+- [x] sanitize.js — capa centralizada de post-procesado del modelo (función pura)
+- [x] Historial limpio — prefijos internos separados del historial de conversación
+- [x] Airbag visual en frontend — limpieza independiente antes de renderizar
 
 ---
 
@@ -89,9 +101,9 @@ Sistema funcional con:
 
 ### 📎 Adjuntos — pendiente
 
-- [ ] Implementar lectura de PPTX (extracción XML de ZIP)
 - [ ] Implementar LibreOffice headless para mejor calidad de extracción de documentos
 - [ ] Añadir soporte visual para archivos adjuntos en el historial del chat
+- [ ] Orden real de slides PPTX leyendo `ppt/presentation.xml` (v2 del extractor)
 
 ### 🧠 Memoria
 
@@ -105,7 +117,7 @@ Sistema funcional con:
 ### 🧩 Proyectos y chats
 
 - [ ] Evitar nombres duplicados de chats/proyectos
-- [ ] Usar modelo más ligero para generación de títulos (evitar usar el modelo principal)
+- [ ] Usar modelo más ligero para generación de títulos
 - [ ] Permitir renombrado automático opcional de proyectos
 - [ ] Añadir opción de cancelar creación de chat pendiente
 
@@ -174,15 +186,13 @@ Sistema funcional con:
 
 ### 📸 Prioridad 3 — Context Snapshot del repo
 - [ ] Generar `projectContext.json` por proyecto con extracto truncado de archivos relevantes
-- [ ] Filtrar por extensión (js, ts, py, json, md, etc.) y archivos clave (README, package.json, routes, controllers, services)
+- [ ] Filtrar por extensión y archivos clave (README, package.json, routes, controllers, services)
 - [ ] Usar hash/mtime para refrescar solo archivos que cambiaron
 - [ ] Subir al contexto archivos mencionados explícitamente por el usuario
-- [ ] Incluir top N archivos tocados recientemente
 
 ### 🩹 Prioridad 4 — Patch Mode para cambios de código
 - [ ] Tempest responde cambios en formato diff/patch en lugar de bloques completos
 - [ ] Formato: archivo + línea anterior + línea nueva
-- [ ] Reducir errores al aplicar cambios en archivos grandes
 
 ### 🤖 Modelos recomendados para programación
 - [ ] DeepSeek-Coder 6.7B — modelo default para código diario (rápido)
@@ -190,18 +200,13 @@ Sistema funcional con:
 - [ ] CodeLlama 13B — backup/comparación
 - [ ] Router elige modelo automáticamente según modo detectado
 
-### 🔮 Para después
-- Embeddings y búsqueda semántica del repo
-- Decisiones técnicas generadas automáticamente por Tempest
-- Visión real en imágenes de código/diagramas
-
 ---
 
 ## 📬 Integración de correo (Outlook)
 
 - [ ] Registrar app en Azure Portal y configurar OAuth 2.0 con Microsoft Graph API
 - [ ] Flujo de autenticación — abre navegador una vez, guarda token para sesiones futuras
-- [ ] Leer correos no leídos desde el chat ("muéstrame los últimos 10 correos")
+- [ ] Leer correos no leídos desde el chat
 - [ ] Resumir correos con LocalAI
 - [ ] Responder correos desde el chat
 - [ ] Organizar correos — mover a carpetas desde el chat
@@ -210,9 +215,9 @@ Sistema funcional con:
 
 ## 📁 Context files por proyecto
 
-- [ ] **Opción 1 — Subida manual desde la interfaz:** subir archivos `.md`, `.txt`, `.js`, etc. directamente desde Tempest, asociados a un proyecto, disponibles en todos sus chats sin adjuntarlos cada vez
-- [ ] **Opción 2 — Lectura de carpeta del disco:** configurar una ruta local por proyecto, Tempest lee automáticamente los archivos de esa carpeta — siempre actualizado sin reemplazar nada manualmente
-- [ ] Pantalla de configuración inicial al crear proyecto — barra de mensaje + sección de context files + sección de ruta de carpeta
+- [ ] **Opción 1 — Subida manual desde la interfaz:** subir archivos asociados a un proyecto, disponibles en todos sus chats sin adjuntarlos cada vez
+- [ ] **Opción 2 — Lectura de carpeta del disco:** configurar una ruta local por proyecto, Tempest lee automáticamente los archivos de esa carpeta
+- [ ] Pantalla de configuración inicial al crear proyecto
 
 ---
 
@@ -228,8 +233,9 @@ Sistema funcional con:
 - [ ] Probar `/project/delete`
 - [ ] Probar `/title/generate`
 - [ ] Probar `/transcribe`
-- [ ] Probar adjuntos: PDF, DOCX, XLSX, TXT, código, imágenes
+- [ ] Probar adjuntos: PDF, DOCX, XLSX, PPTX, TXT, código, imágenes
 - [ ] Probar router de modos: explain / coder strict / coder hybrid / general
+- [ ] Probar sanitize.js con distintos tipos de basura del modelo
 
 ---
 
@@ -249,9 +255,9 @@ Sistema funcional con:
 
 ## 🔮 vX.x
 
-- [ ] Lectura de PPTX (extracción XML de ZIP)
 - [ ] Añadir respaldo/exportación de memoria
 - [ ] LibreOffice headless para extracción de documentos de alta fidelidad
+- [ ] Orden real de slides PPTX via `ppt/presentation.xml`
 - [ ] Función de voz al chat: hablar → texto → consulta
 - [ ] Stream de audio en vivo con Faster-Whisper
 - [ ] Migrar JSON a SQLite/PostgreSQL

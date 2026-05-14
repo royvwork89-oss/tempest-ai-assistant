@@ -50,21 +50,28 @@ async function chat(req, res) {
       configMode: config.mode || null
     });
 
-    console.log(`[MODE ROUTER] mode=${mode} variant=${variant} reason="${reason}"`);
+console.log(`[MODE ROUTER] mode=${mode} variant=${variant} reason="${reason}"`);
 
     const userMessage = buildPrefixedMessage(rawTrimmed, mode, variant);
     const memoryOptions = buildMemoryOptions(req);
 
-    memory.detectUserData(userMessage, memoryOptions);
+    // detectUserData recibe el mensaje limpio, sin prefijos de instrucción
+    memory.detectUserData(rawTrimmed, memoryOptions);
 
     const attachmentContext = await buildAttachmentContext(files);
     const attachmentNames = getAttachmentNames(files);
 
+    // finalMessage: con prefijo → va al modelo
     const finalMessage = attachmentContext
       ? `${userMessage}\n\n${attachmentContext}`
       : userMessage;
 
-    memory.addChatHistoryMessage('user', finalMessage, memoryOptions);
+    // historialMessage: sin prefijo → se guarda en memoria
+    const historialMessage = attachmentContext
+      ? `${rawTrimmed}\n\n${attachmentContext}`
+      : rawTrimmed;
+
+    memory.addChatHistoryMessage('user', historialMessage, memoryOptions);
 
     if (attachmentContext) {
       memory.addMessage('user', attachmentContext, memoryOptions);

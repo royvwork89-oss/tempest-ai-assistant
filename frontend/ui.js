@@ -342,12 +342,36 @@ export function createStreamingBubble(chatBox) {
   return { row, bubble, rawEl };
 }
 
+// ─── Airbag visual — limpieza de salida del modelo ───────────────────────────
+
+const VISUAL_STOP_TOKENS = /<\|im_end\|>|<\|end_of_text\|>|<\|begin_of_text\|>|<\|eot_id\|>|<\|im_start\|>/g;
+
+const VISUAL_INSTRUCTION_PATTERNS = [
+  /Responde SOLO con texto explicativo,?\s*sin bloques de código\.?\s*/gi,
+  /Explica brevemente en texto y luego entrega el código organizado por archivos\.?\s*/gi,
+  /Analiza los archivos adjuntos\.?\s*/gi
+];
+
+function stripLeakedInstructions(text) {
+  let result = text;
+  for (const pattern of VISUAL_INSTRUCTION_PATTERNS) {
+    const checkFrom = Math.max(0, result.length - Math.max(300, Math.floor(result.length * 0.2)));
+    const tail = result.slice(checkFrom);
+    const cleaned = tail.replace(pattern, '').trimEnd();
+    if (cleaned !== tail) {
+      result = result.slice(0, checkFrom) + cleaned;
+    }
+  }
+  return result.trim();
+}
+
 /**
  * Cuando el stream termina, reemplaza el <pre> de texto plano
  * por el renderizado final con bloques de código y acciones.
  */
 export function finalizeStreamingBubble(bubble, rawEl, fullText) {
-  const cleanText = fullText.replace(/<\|im_end\|>|<\|end_of_text\|>|<\|begin_of_text\|>|<\|eot_id\|>|<\|im_start\|>/g, '').trim();
+  const withoutStopTokens = fullText.replace(VISUAL_STOP_TOKENS, '').trim();
+  const cleanText = stripLeakedInstructions(withoutStopTokens);
   bubble.removeChild(rawEl);
 
   const content = document.createElement('div');

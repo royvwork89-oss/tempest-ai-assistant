@@ -1,13 +1,11 @@
+const { sanitizeModelOutput } = require('./sanitize');
+
+/**
+ * Wrapper legacy — mantiene compatibilidad con todo lo que ya importa cleanReply.
+ * La lógica real vive en sanitize.js.
+ */
 function cleanReply(text) {
-  return text
-    .replace(/<\|im_end\|>/g, '')
-    .replace(/<\|eot_id\|>/g, '')
-    .replace(/<\|end_of_text\|>/g, '')
-    .replace(/<\|begin_of_text\|>/g, '')
-    .replace(/<\|im_start\|>/g, '')
-    .replace(/^assistant\s*/i, '')
-    .replace(/^:+/g, '')
-    .trim();
+  return sanitizeModelOutput(text);
 }
 
 module.exports = cleanReply;
