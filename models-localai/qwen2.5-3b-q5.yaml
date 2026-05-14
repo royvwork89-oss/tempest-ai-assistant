@@ -1,0 +1,7 @@
+name: qwen2.5-3b-q5
+backend: llama-cpp
+parameters:
+  model: qwen2.5-3b-instruct-q5_k_m.gguf
+temperature: 0.25
+context_size: 2048
+threads: 8

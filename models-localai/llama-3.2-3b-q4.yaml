@@ -1,0 +1,23 @@
+name: llama-3.2-3b-q4
+backend: llama-cpp
+model: Hermes-3-Llama-3.2-3B-Q4_K_M.gguf
+
+threads: 6
+context_size: 4096
+
+parameters:
+  model: Hermes-3-Llama-3.2-3B-Q4_K_M.gguf
+  temperature: 0
+  top_p: 0.9
+  max_tokens: 1000
+  stopwords:
+    - "<|im_end|>"
+    - "<|end_of_text|>"
+
+template:
+  chatMessage: |
+    <|start_header_id|>{{.RoleName}}<|end_header_id|>
+
+    {{.Content}}<|eot_id|>
+  chat: |
+    <|begin_of_text|>{{.Input}}<|start_header_id|>assistant<|end_header_id|>

@@ -6,12 +6,15 @@ dist/
 build/
 
 models/
-models-localai/
 *.gguf
 *.bin
 *.safetensors
 *.ckpt
 *.tar.gz
+
+# Excluir modelos pesados dentro de models-localai pero conservar YAMLs
+models-localai/*.gguf
+models-localai/*.bin
 
 backend/uploads/
 backend/outputs/

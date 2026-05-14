@@ -1,0 +1,16 @@
+name: qwen2.5-3b-q4
+backend: llama-cpp
+parameters:
+  model: qwen2.5-3b-instruct-q4_k_m.gguf
+  temperature: 0.2
+  top_p: 0.9
+  max_tokens: 900
+context_size: 2048
+threads: 8
+template:
+  chat: |
+    <|im_start|>system
+    {{.System}}<|im_end|>
+    {{range .Messages}}<|im_start|>{{.Role}}
+    {{.Content}}<|im_end|>
+    {{end}}<|im_start|>assistant

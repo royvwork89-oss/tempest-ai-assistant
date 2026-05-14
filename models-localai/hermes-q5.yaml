@@ -1,0 +1,24 @@
+name: hermes-q5
+backend: llama-cpp
+model: Hermes-3-Llama-3.1-8B.Q5_K_M.gguf
+
+threads: 8
+context_size: 4096
+
+parameters:
+  model: Hermes-3-Llama-3.1-8B.Q5_K_M.gguf
+  temperature: 0
+  top_p: 0.9
+  max_tokens: 1900
+  n_gpu_layers: 15
+  stopwords:
+    - "<|im_end|>"
+    - "<|end_of_text|>"
+
+template:
+  chat: |
+    <|im_start|>system
+    {{.System}}<|im_end|>
+    {{range .Messages}}<|im_start|>{{.Role}}
+    {{.Content}}<|im_end|>
+    {{end}}<|im_start|>assistant

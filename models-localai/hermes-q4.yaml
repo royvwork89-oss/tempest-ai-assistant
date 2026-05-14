@@ -1,0 +1,31 @@
+name: hermes-q4
+backend: llama-cpp
+model: Hermes-3-Llama-3.1-8B-Q4_K_M.gguf
+
+threads: 8
+context_size: 4096
+
+parameters:
+  model: Hermes-3-Llama-3.1-8B-Q4_K_M.gguf
+  temperature: 0.7
+  top_p: 0.95
+  top_k: 40
+  repeat_penalty: 1.18
+  mirostat: 2
+  mirostat_tau: 5.0
+  mirostat_eta: 0.1
+  stopwords:
+    - "<|im_end|>"
+    - "<|end_of_text|>"
+    - "<|im_start|>"
+    - "://"
+
+template:
+  chat: |
+    {{if .System}}<|im_start|>system
+    {{.System}}<|im_end|>
+    {{end}}
+    {{range .Messages}}<|im_start|>{{.Role}}
+    {{.Content}}<|im_end|>
+    {{end}}
+    <|im_start|>assistant
