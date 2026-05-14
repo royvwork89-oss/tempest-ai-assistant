@@ -1,6 +1,7 @@
 const cleanReply = require('../utils/cleanReply');
 const memory = require('./memory.service');
-const { getCurrentTimeAnswer, getControlledMemoryAnswer, buildSystemPrompt } = require('./localai/memory.answers');
+const { getCurrentTimeAnswer, getControlledMemoryAnswer } = require('./localai/memory.answers');
+const { buildSystemPrompt } = require('../config/buildSystemPrompt');
 const { looksLikeCutReply, removeIncompleteFileBlock } = require('./localai/response.validator');
 const { getMaxTokens } = require('./localai/token.profiles');
 
@@ -35,11 +36,11 @@ async function sendToLocalAI(message, options = DEFAULT_MEMORY_OPTIONS) {
 
   const chatHistory = memory.getChatHistory(options)
     .filter(msg => msg.content && msg.content.trim() !== '')
-    .slice(-7, -1)
+    .slice(-4)
     .map(msg => ({ role: msg.role, content: msg.content }));
 
   const messages = [
-    { role: 'system', content: buildSystemPrompt(fullMemory) },
+    { role: 'system', content: buildSystemPrompt({ fullMemory, mode: options.mode || 'general', variant: options.variant || null, userId: options.userId, projectId: options.projectId }) },
     ...chatHistory,
     { role: 'user', content: message }
   ];
@@ -57,7 +58,8 @@ async function sendToLocalAI(message, options = DEFAULT_MEMORY_OPTIONS) {
     body: JSON.stringify({
       model: options.primaryModel || 'hermes-q4',
       stream: false,
-      temperature: 0,
+      temperature: 0.3,
+      stop: ['<|im_end|>', '<|im_start|>', '://'],
       max_tokens: getMaxTokens(options.primaryModel, message, options.mode || 'general', options.hardwareProfile || 'laptop'),
       messages
     })
@@ -91,7 +93,8 @@ async function sendToLocalAI(message, options = DEFAULT_MEMORY_OPTIONS) {
       body: JSON.stringify({
         model: options.primaryModel || 'hermes-q4',
         stream: false,
-        temperature: 0,
+        temperature: 0.3,
+        stop: ['<|im_end|>', '<|im_start|>', '://'],
         max_tokens: getMaxTokens(options.primaryModel, message, 'continue', options.hardwareProfile || 'laptop'),
         messages: [
           ...messages,
@@ -161,7 +164,7 @@ async function generateTitleFromText(text, type = 'chat', model = 'hermes-q4') {
       body: JSON.stringify({
         model,
         stream: false,
-        temperature: 0,
+        temperature: 0.3,
         max_tokens: 12,
         messages: [
           {
@@ -189,15 +192,9 @@ async function generateTitleFromText(text, type = 'chat', model = 'hermes-q4') {
 
 // ─── STREAMING ────────────────────────────────────────────────────────────────
 
-/**
- * Igual que sendToLocalAI pero devuelve un AsyncGenerator que
- * yield-ea tokens conforme llegan desde LocalAI.
- * Si LocalAI no soporta stream, hace fallback a no-stream.
- */
 async function* streamToLocalAI(message, options = DEFAULT_MEMORY_OPTIONS) {
   const fullMemory = memory.getFullMemory(options);
 
-  // Respuestas rápidas sin llamar a LocalAI
   const timeAnswer = getCurrentTimeAnswer(message);
   if (timeAnswer) {
     memory.addChatHistoryMessage('assistant', timeAnswer, options);
@@ -223,11 +220,11 @@ async function* streamToLocalAI(message, options = DEFAULT_MEMORY_OPTIONS) {
 
   const chatHistory = memory.getChatHistory(options)
     .filter(msg => msg.content && msg.content.trim() !== '')
-    .slice(-7, -1)
+    .slice(-4)
     .map(msg => ({ role: msg.role, content: msg.content }));
 
   const messages = [
-    { role: 'system', content: buildSystemPrompt(fullMemory) },
+    { role: 'system', content: buildSystemPrompt({ fullMemory, mode: options.mode || 'general', variant: options.variant || null, userId: options.userId, projectId: options.projectId }) },
     ...chatHistory,
     { role: 'user', content: message }
   ];
@@ -245,7 +242,8 @@ async function* streamToLocalAI(message, options = DEFAULT_MEMORY_OPTIONS) {
       body: JSON.stringify({
         model: options.primaryModel || 'hermes-q4',
         stream: true,
-        temperature: 0,
+        temperature: 0.3,
+        stop: ['<|im_end|>', '<|im_start|>', '://'],
         max_tokens: getMaxTokens(options.primaryModel, message, options.mode || 'general', options.hardwareProfile || 'laptop'),
         messages
       })
@@ -260,6 +258,7 @@ async function* streamToLocalAI(message, options = DEFAULT_MEMORY_OPTIONS) {
     const decoder = new TextDecoder();
     let buffer = '';
     let stopped = false;
+    let started = false;
     const STOP_REGEX = /<\|im_end\|>|<\|end_of_text\|>|<\|begin_of_text\|>|<\|eot_id\|>|<\|im_start\|>/g;
 
     while (true) {
@@ -286,6 +285,28 @@ async function* streamToLocalAI(message, options = DEFAULT_MEMORY_OPTIONS) {
           if (rawToken == null) continue;
 
           fullReply += rawToken;
+
+          // Startup buffer — no emitir hasta tener contenido limpio
+          if (!started) {
+            const cleaned = fullReply.replace(/^[:\s\/\\]+/, '');
+            if (cleaned.length < 3) continue;
+            started = true;
+            fullReply = cleaned;
+            yield cleaned;
+            continue;
+          }
+
+          // Detectar loop genérico en tiempo real
+          if (fullReply.length > 80) {
+            const recent = fullReply.slice(-400);
+            const sentences = recent.split(/[.?!¿¡\n]+/).map(s => s.trim()).filter(s => s.length > 8);
+            const unique = new Set(sentences);
+            if (sentences.length >= 6 && unique.size < sentences.length * 0.5) {
+              stopped = true;
+              break;
+            }
+          }
+
           yield rawToken;
 
         } catch {
@@ -298,7 +319,7 @@ async function* streamToLocalAI(message, options = DEFAULT_MEMORY_OPTIONS) {
   } finally {
     clearTimeout(timeoutId);
   }
-  // Limpiar y guardar respuesta completa
+
   fullReply = cleanReply(fullReply);
   if (!fullReply) fullReply = 'No pude generar una respuesta válida.';
 

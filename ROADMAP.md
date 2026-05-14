@@ -239,17 +239,27 @@ Sistema funcional con:
 
 ---
 
-## 🎯 v2.0 — Tempest como asistente de programación real
+## 🎯 v2.0 — Tempest como asistente de programación contextual
 
-- [ ] System prompt por capas por proyecto (global + proyecto + tarea)
-- [ ] Context Snapshot del repo — `projectContext.json` con archivos relevantes, hash/mtime
-- [ ] Patch Mode — cambios en formato diff en lugar de bloques completos
-- [ ] DeepSeek-Coder 6.7B como modelo default para código diario
-- [ ] Qwen2.5-Coder 14B para modo calidad/arquitectura
-- [ ] CodeLlama 13B como backup/comparación
-- [ ] Router elige modelo automáticamente según modo detectado
-- [ ] Context files por proyecto — subida manual + lectura de carpeta del disco
+### 🧠 Contexto y comprensión del proyecto
+- [ ] Context Snapshot del repo — generación de `projectContext.json` con estructura, archivos relevantes, hash y mtime
+- [ ] Context files por proyecto — subida manual + lectura opcional de carpetas del disco
+- [ ] System prompts por capas — contexto global + proyecto + tarea activa
+
+### 🤖 Inteligencia y selección de modelos
+- [ ] Router inteligente de modelos — selección automática según modo detectado y tipo de tarea
+- [ ] DeepSeek-Coder 6.7B como modelo principal para programación diaria
+- [ ] Qwen2.5-Coder 14B para tareas de arquitectura, calidad y razonamiento complejo
+- [ ] CodeLlama 13B como fallback, comparación o recuperación
+
+### 🛠️ Edición y flujo de desarrollo
+- [ ] Patch Mode — generación de cambios en formato diff en lugar de archivos completos
+- [ ] Aplicación parcial de cambios sobre archivos existentes
+- [ ] Mejoras futuras para continuidad de contexto entre sesiones técnicas
+
+### ⚙️ Experiencia de proyecto
 - [ ] Pantalla de configuración inicial al crear proyecto
+- [ ] Configuración persistente por proyecto (modelo, modo, prompts, contexto)
 
 ---
 

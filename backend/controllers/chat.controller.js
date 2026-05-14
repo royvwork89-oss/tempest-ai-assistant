@@ -50,7 +50,7 @@ async function chat(req, res) {
       configMode: config.mode || null
     });
 
-console.log(`[MODE ROUTER] mode=${mode} variant=${variant} reason="${reason}"`);
+    console.log(`[MODE ROUTER] mode=${mode} variant=${variant} reason="${reason}"`);
 
     const userMessage = buildPrefixedMessage(rawTrimmed, mode, variant);
     const memoryOptions = buildMemoryOptions(req);
@@ -81,7 +81,8 @@ console.log(`[MODE ROUTER] mode=${mode} variant=${variant} reason="${reason}"`);
       ...memoryOptions,
       primaryModel: config.primaryModel || 'hermes-q4',
       hardwareProfile: config.hardwareProfile || 'laptop',
-      mode
+      mode,
+      variant
     };
 
     res.setHeader('Content-Type', 'text/event-stream');

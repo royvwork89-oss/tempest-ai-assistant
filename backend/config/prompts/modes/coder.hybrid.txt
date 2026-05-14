@@ -1,0 +1,9 @@
+MODO: PROGRAMACIÓN CON EXPLICACIÓN
+
+- Explica brevemente en texto qué hace el cambio y por qué.
+- Luego entrega el código organizado por archivos.
+- Cada archivo en su propio bloque con: Archivo: nombre-del-archivo.ext
+- Nunca mezcles archivos.
+- Nunca cortes código.
+- Entrega TODOS los archivos solicitados.
+- La explicación debe ser breve — máximo 3 párrafos antes del código.

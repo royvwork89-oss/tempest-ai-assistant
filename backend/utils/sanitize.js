@@ -1,17 +1,8 @@
 /**
  * sanitize.js — Capa de post-procesado de salidas del modelo
- *
- * Función pura: recibe texto, devuelve texto.
- * Sin dependencias externas, sin logs, sin DOM.
- * Reutilizable en backend, tests, Electron, etc.
  */
 
-// ─── Stop tokens de modelos Hermes / LLaMA ───────────────────────────────────
-
 const STOP_TOKEN_REGEX = /<\|im_end\|>|<\|end_of_text\|>|<\|begin_of_text\|>|<\|eot_id\|>|<\|im_start\|>/g;
-
-// ─── Prefijos internos que el backend inyecta al modelo ──────────────────────
-// Solo se eliminan si aparecen al final del texto (el modelo los repite)
 
 const INTERNAL_INSTRUCTION_PATTERNS = [
   /Responde SOLO con texto explicativo,?\s*sin bloques de código\.?\s*/gi,
@@ -19,19 +10,14 @@ const INTERNAL_INSTRUCTION_PATTERNS = [
   /Analiza los archivos adjuntos\.?\s*/gi
 ];
 
-// ─── Basura típica del modelo ─────────────────────────────────────────────────
-
 const MODEL_NOISE_REGEX = [
-  /^assistant\s*/i,   // algunos modelos prefijan su respuesta con "assistant"
-  /^:+/               // dos puntos al inicio
+  /^[:\s\/\\]+/,
+  /^assistant\s*/i,
+  /(:\/\/\s*)+$/,
+  /(\s*&nbsp;\s*){3,}$/,
+  /(\t\/\/[^\n]*)+$/
 ];
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-/**
- * Elimina prefijos internos solo si aparecen al final del texto.
- * Evita falsos positivos en medio de respuestas legítimas.
- */
 function stripTrailingInstructions(text) {
   let result = text;
   for (const pattern of INTERNAL_INSTRUCTION_PATTERNS) {
@@ -45,17 +31,28 @@ function stripTrailingInstructions(text) {
   return result;
 }
 
-// ─── API pública ──────────────────────────────────────────────────────────────
+function stripRepetitionLoop(text) {
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  if (lines.length < 4) return text;
 
-/**
- * @param {string} text  Texto crudo del modelo
- * @param {object} [options]
- * @param {boolean} [options.stripStopTokens=true]
- * @param {boolean} [options.stripInternalInstructions=true]
- * @param {boolean} [options.stripModelNoise=true]
- * @param {boolean} [options.normalizeWhitespace=true]
- * @returns {string}
- */
+  let count = 1;
+  for (let i = 1; i < lines.length; i++) {
+    if (lines[i] === lines[i - 1]) {
+      count++;
+      if (count > 3) {
+        const cutIndex = text.indexOf(lines[i - 1]);
+        const secondIndex = text.indexOf(lines[i - 1], cutIndex + lines[i - 1].length);
+        if (secondIndex !== -1) {
+          return text.slice(0, secondIndex).trim();
+        }
+      }
+    } else {
+      count = 1;
+    }
+  }
+  return text;
+}
+
 function sanitizeModelOutput(text, options = {}) {
   const {
     stripStopTokens = true,
@@ -79,6 +76,8 @@ function sanitizeModelOutput(text, options = {}) {
   if (stripInternalInstructions) {
     result = stripTrailingInstructions(result);
   }
+
+  result = stripRepetitionLoop(result);
 
   if (normalizeWhitespace) {
     result = result.trim();

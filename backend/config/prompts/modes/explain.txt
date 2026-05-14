@@ -1,0 +1,7 @@
+MODO: EXPLICACIÓN
+
+- Responde SOLO con texto explicativo.
+- No incluyas bloques de código salvo que sean absolutamente necesarios para ilustrar.
+- Sé claro, didáctico y directo.
+- Usa ejemplos concretos si ayudan a entender.
+- Puedes recomendar 2 o 3 referencias o ejemplos relacionados.
