@@ -36,13 +36,22 @@ async function sendToLocalAI(message, options = DEFAULT_MEMORY_OPTIONS) {
 
   const chatHistory = memory.getChatHistory(options)
     .filter(msg => msg.content && msg.content.trim() !== '')
+    .filter(isUsefulMessage)
     .slice(-2)
     .map(msg => ({ role: msg.role, content: msg.content }));
 
+  let processedMessage = message.trim();
+  const cleanedMsg = processedMessage.replace(/[¿?¡!]/g, '').trim();
+  const preguntaWords = /^(cual|como|que|por que|cuando|donde|quien|cuanto|cuales|cómo|qué|cuándo|dónde|quién|cuánto|dime|explica|habla)/i;
+  if (cleanedMsg.length > 3 && cleanedMsg.length <= 50 && !preguntaWords.test(cleanedMsg)) {
+    processedMessage = `Háblame brevemente sobre: ${cleanedMsg}.`;
+  } else if (cleanedMsg.length <= 2) {
+    processedMessage = 'Necesito más contexto para responderte.';
+  }
   const messages = [
     { role: 'system', content: buildSystemPrompt({ fullMemory, mode: options.mode || 'general', variant: options.variant || null, userId: options.userId, projectId: options.projectId }) },
     ...chatHistory,
-    { role: 'user', content: message }
+    { role: 'user', content: processedMessage }
   ];
 
   console.log('HISTORIAL ENVIADO A LOCALAI:', messages);
@@ -59,7 +68,7 @@ async function sendToLocalAI(message, options = DEFAULT_MEMORY_OPTIONS) {
       model: options.primaryModel || 'hermes-q4',
       stream: false,
       temperature: 0.3,
-      stop: ['<|im_end|>', '<|im_start|>', '://', '\nUsuario:', '\nUser:', 'Responder', '<?php', '¿En qué puedo ayudarte', '¿En qué puedo asistirte'],
+      stop: ['<|im_end|>', '<|im_start|>', '://', '\nUser:', '¿Hay algo más', '¿Hay algún'],
       max_tokens: getMaxTokens(options.primaryModel, message, options.mode || 'general', options.hardwareProfile || 'laptop'),
       messages
     })
@@ -76,6 +85,7 @@ async function sendToLocalAI(message, options = DEFAULT_MEMORY_OPTIONS) {
   console.log('RESPUESTA LOCALAI:', data);
 
   let reply = data?.choices?.[0]?.message?.content || data?.choices?.[0]?.text || 'Sin respuesta';
+  console.log('RAW REPLY:', reply);
   reply = cleanReply(reply);
 
   if (!reply) reply = 'No pude generar una respuesta válida.';
@@ -94,7 +104,7 @@ async function sendToLocalAI(message, options = DEFAULT_MEMORY_OPTIONS) {
         model: options.primaryModel || 'hermes-q4',
         stream: false,
         temperature: 0.3,
-        stop: ['<|im_end|>', '<|im_start|>', '://', '\nUsuario:', '\nUser:', 'Responder', '<?php', '¿En qué puedo ayudarte', '¿En qué puedo asistirte'],
+        stop: ['<|im_end|>', '<|im_start|>', '://', '\nUser:', '¿Hay algo más', '¿Hay algún'],
         max_tokens: getMaxTokens(options.primaryModel, message, 'continue', options.hardwareProfile || 'laptop'),
         messages: [
           ...messages,
@@ -220,13 +230,23 @@ async function* streamToLocalAI(message, options = DEFAULT_MEMORY_OPTIONS) {
 
   const chatHistory = memory.getChatHistory(options)
     .filter(msg => msg.content && msg.content.trim() !== '')
+    .filter(isUsefulMessage)
     .slice(-2)
     .map(msg => ({ role: msg.role, content: msg.content }));
+
+  let processedMessage = message.trim();
+  const cleanedMsg = processedMessage.replace(/[¿?¡!]/g, '').trim();
+  const preguntaWords = /^(cual|como|que|por que|cuando|donde|quien|cuanto|cuales|cómo|qué|cuándo|dónde|quién|cuánto|dime|explica|habla)/i;
+  if (cleanedMsg.length > 3 && cleanedMsg.length <= 50 && !preguntaWords.test(cleanedMsg)) {
+    processedMessage = `Háblame brevemente sobre: ${cleanedMsg}.`;
+  } else if (cleanedMsg.length <= 2) {
+    processedMessage = 'Necesito más contexto para responderte.';
+  }
 
   const messages = [
     { role: 'system', content: buildSystemPrompt({ fullMemory, mode: options.mode || 'general', variant: options.variant || null, userId: options.userId, projectId: options.projectId }) },
     ...chatHistory,
-    { role: 'user', content: message }
+    { role: 'user', content: processedMessage }
   ];
 
   const controller = new AbortController();
@@ -243,7 +263,7 @@ async function* streamToLocalAI(message, options = DEFAULT_MEMORY_OPTIONS) {
         model: options.primaryModel || 'hermes-q4',
         stream: true,
         temperature: 0.3,
-        stop: ['<|im_end|>', '<|im_start|>', '://', '\nUsuario:', '\nUser:', 'Responder', '<?php', '¿En qué puedo ayudarte', '¿En qué puedo asistirte'],
+        stop: ['<|im_end|>', '<|im_start|>', '://', '\nUser:', '¿Hay algo más', '¿Hay algún'],
         max_tokens: getMaxTokens(options.primaryModel, message, options.mode || 'general', options.hardwareProfile || 'laptop'),
         messages
       })
@@ -289,7 +309,7 @@ async function* streamToLocalAI(message, options = DEFAULT_MEMORY_OPTIONS) {
           // Startup buffer — no emitir hasta tener contenido limpio
           if (!started) {
             const cleaned = fullReply.replace(/^[:\s\/\\]+/, '');
-            if (cleaned.length < 3) continue;
+            if (cleaned.length < 1) continue;
             started = true;
             fullReply = cleaned;
             yield cleaned;
@@ -305,8 +325,9 @@ async function* streamToLocalAI(message, options = DEFAULT_MEMORY_OPTIONS) {
               stopped = true; break;
             }
             // Detector genérico de n-gramas repetidos
-            const repeated = /(.{15,60})\1/s.test(recent);
-            if (repeated) { stopped = true; break; }
+            const repeated = /(.{15,80})\1{2,}/s.test(recent);
+            const shortLoop = /^(\S+\s*){1,3}\n(\1\s*){3,}/m.test(recent);
+            if (repeated || shortLoop) { stopped = true; break; }
           }
 
           yield rawToken;
@@ -326,6 +347,26 @@ async function* streamToLocalAI(message, options = DEFAULT_MEMORY_OPTIONS) {
   if (!fullReply) fullReply = 'No pude generar una respuesta válida.';
 
   memory.addChatHistoryMessage('assistant', fullReply, options);
+}
+
+function isUsefulMessage(msg) {
+  if (msg.role !== 'assistant') return true; // siempre conservar mensajes del usuario
+
+  const content = msg.content?.toLowerCase().trim() || '';
+
+  // Descartar mensajes cortos que son solo saludos/frases genéricas
+  const genericPhrases = [
+    'hola', 'en qué puedo ayudarte', 'cómo estás', 'cómo te llamas',
+    'estoy bien', 'puedo asistirte', 'puedo ayudarte hoy',
+    'en qué puedo', 'cómo puedo ayudarte'
+  ];
+
+  // Si el mensaje es corto Y contiene una frase genérica, descartar
+  if (content.length < 80 && genericPhrases.some(p => content.includes(p))) {
+    return false;
+  }
+
+  return true;
 }
 
 module.exports = {

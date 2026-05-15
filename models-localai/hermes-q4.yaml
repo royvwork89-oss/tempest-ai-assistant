@@ -9,15 +9,23 @@ gpu-layers: 99
 
 parameters:
   model: Hermes-3-Llama-3.1-8B-Q4_K_M.gguf
-  temperature: 0.2
-  top_p: 0.8
-  repeat_penalty: 1.15
+  temperature: 0.35
+  top_p: 0.9
+  mirostat: 2
+  mirostat_tau: 4.5
+  mirostat_eta: 0.1
+  repeat_penalty: 1.18
 
 stopwords:
   - "<|im_end|>"
   - "<|end_of_text|>"
   - "<|im_start|>"
   - "://"
+  - "\n```"
+  - "def "
+  - "class "
+  - "¿Hay algo más"
+  - "¿Hay algún"
 
 template:
   chat: |

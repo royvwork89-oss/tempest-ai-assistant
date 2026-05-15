@@ -15,6 +15,7 @@ function formatList(items) {
 
 function getCurrentTimeAnswer(message) {
   const question = normalizeQuestion(message);
+  
   const asksTime =
     question.includes('que hora es') ||
     question.includes('dime la hora') ||
@@ -22,9 +23,28 @@ function getCurrentTimeAnswer(message) {
     question.includes('dame la hora') ||
     question.includes('que hora');
 
-  if (!asksTime) return null;
+  const asksDate =
+    question.includes('que dia es') ||
+    question.includes('que fecha es') ||
+    question.includes('fecha actual') ||
+    question.includes('que dia estamos') ||
+    question.includes('en que fecha estamos') ||
+    question.includes('que dia es hoy');
+
+  if (!asksTime && !asksDate) return null;
 
   const now = new Date();
+
+  if (asksDate) {
+    const date = now.toLocaleDateString('es-MX', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+    return `Hoy es ${date}.`;
+  }
+
   const time = now.toLocaleTimeString('es-MX', {
     hour: '2-digit',
     minute: '2-digit',
