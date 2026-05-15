@@ -36,7 +36,7 @@ async function sendToLocalAI(message, options = DEFAULT_MEMORY_OPTIONS) {
 
   const chatHistory = memory.getChatHistory(options)
     .filter(msg => msg.content && msg.content.trim() !== '')
-    .slice(-4)
+    .slice(-2)
     .map(msg => ({ role: msg.role, content: msg.content }));
 
   const messages = [
@@ -59,7 +59,7 @@ async function sendToLocalAI(message, options = DEFAULT_MEMORY_OPTIONS) {
       model: options.primaryModel || 'hermes-q4',
       stream: false,
       temperature: 0.3,
-      stop: ['<|im_end|>', '<|im_start|>', '://'],
+      stop: ['<|im_end|>', '<|im_start|>', '://', '\nUsuario:', '\nUser:', 'Responder', '<?php', '¿En qué puedo ayudarte', '¿En qué puedo asistirte'],
       max_tokens: getMaxTokens(options.primaryModel, message, options.mode || 'general', options.hardwareProfile || 'laptop'),
       messages
     })
@@ -94,7 +94,7 @@ async function sendToLocalAI(message, options = DEFAULT_MEMORY_OPTIONS) {
         model: options.primaryModel || 'hermes-q4',
         stream: false,
         temperature: 0.3,
-        stop: ['<|im_end|>', '<|im_start|>', '://'],
+        stop: ['<|im_end|>', '<|im_start|>', '://', '\nUsuario:', '\nUser:', 'Responder', '<?php', '¿En qué puedo ayudarte', '¿En qué puedo asistirte'],
         max_tokens: getMaxTokens(options.primaryModel, message, 'continue', options.hardwareProfile || 'laptop'),
         messages: [
           ...messages,
@@ -220,7 +220,7 @@ async function* streamToLocalAI(message, options = DEFAULT_MEMORY_OPTIONS) {
 
   const chatHistory = memory.getChatHistory(options)
     .filter(msg => msg.content && msg.content.trim() !== '')
-    .slice(-4)
+    .slice(-2)
     .map(msg => ({ role: msg.role, content: msg.content }));
 
   const messages = [
@@ -243,7 +243,7 @@ async function* streamToLocalAI(message, options = DEFAULT_MEMORY_OPTIONS) {
         model: options.primaryModel || 'hermes-q4',
         stream: true,
         temperature: 0.3,
-        stop: ['<|im_end|>', '<|im_start|>', '://'],
+        stop: ['<|im_end|>', '<|im_start|>', '://', '\nUsuario:', '\nUser:', 'Responder', '<?php', '¿En qué puedo ayudarte', '¿En qué puedo asistirte'],
         max_tokens: getMaxTokens(options.primaryModel, message, options.mode || 'general', options.hardwareProfile || 'laptop'),
         messages
       })
@@ -297,14 +297,16 @@ async function* streamToLocalAI(message, options = DEFAULT_MEMORY_OPTIONS) {
           }
 
           // Detectar loop genérico en tiempo real
-          if (fullReply.length > 80) {
-            const recent = fullReply.slice(-400);
-            const sentences = recent.split(/[.?!¿¡\n]+/).map(s => s.trim()).filter(s => s.length > 8);
-            const unique = new Set(sentences);
-            if (sentences.length >= 6 && unique.size < sentences.length * 0.5) {
-              stopped = true;
-              break;
+          if (fullReply.length > 60) {
+            const recent = fullReply.slice(-300);
+            // Detectar repetición de frases similares
+            if (recent.includes('¿Cómo te gustaría') &&
+              (recent.match(/¿Cómo te gustaría/g) || []).length > 1) {
+              stopped = true; break;
             }
+            // Detector genérico de n-gramas repetidos
+            const repeated = /(.{15,60})\1/s.test(recent);
+            if (repeated) { stopped = true; break; }
           }
 
           yield rawToken;
