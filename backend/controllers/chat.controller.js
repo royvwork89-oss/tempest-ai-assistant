@@ -28,7 +28,6 @@ function buildPrefixedMessage(rawMessage, mode, variant) {
 }
 
 async function chat(req, res) {
-  console.log('CHAT REQUEST RECEIVED', req.body?.message);
   const files = req.files || [];
 
   try {

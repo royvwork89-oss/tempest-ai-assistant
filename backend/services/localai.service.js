@@ -85,7 +85,6 @@ async function sendToLocalAI(message, options = DEFAULT_MEMORY_OPTIONS) {
   console.log('RESPUESTA LOCALAI:', data);
 
   let reply = data?.choices?.[0]?.message?.content || data?.choices?.[0]?.text || 'Sin respuesta';
-  console.log('RAW REPLY:', reply);
   reply = cleanReply(reply);
 
   if (!reply) reply = 'No pude generar una respuesta válida.';
@@ -255,7 +254,6 @@ async function* streamToLocalAI(message, options = DEFAULT_MEMORY_OPTIONS) {
   let fullReply = '';
 
   try {
-    console.log('PROCESSED MESSAGE:', processedMessage);
     const response = await fetch('http://127.0.0.1:8080/v1/chat/completions', {
       method: 'POST',
       signal: controller.signal,
