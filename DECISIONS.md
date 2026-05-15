@@ -203,27 +203,21 @@ Permite preguntas de seguimiento con acceso al contenido del archivo.
 ## 📎 Extractor PPTX con arquitectura modular
 
 ### Decisión
-Crear `backend/services/attachment/extractors/pptx.extractor.js` como módulo independiente en lugar de agregar el caso directamente en `attachment.service.js`.
+Crear `backend/services/attachment/extractors/pptx.extractor.js` como módulo independiente.
 
 ### Razón
-Separación de responsabilidades. `attachment.service.js` actúa como orquestador; cada formato complejo tiene su propio extractor. Escalable para agregar PPT legacy, LibreOffice headless, etc.
+Separación de responsabilidades. `attachment.service.js` actúa como orquestador; cada formato complejo tiene su propio extractor.
 
 ### Contrato de salida
-Todos los extractores devuelven `{ name, type, content, truncated, original, meta? }`. El campo `meta` permite datos específicos del tipo (ej. `{ slides: 18, hasNotes: true }` para PPTX).
+Todos los extractores devuelven `{ name, type, content, truncated, original, meta? }`.
 
 ### PPTX — implementación
 - Valida magic bytes ZIP (`PK 0x50 0x4B`) antes de parsear.
 - Extrae texto de `ppt/slides/slideN.xml` ordenado por número de slide.
-- Extrae notas del presentador de `ppt/notesSlides/notesSlideN.xml` (default ON, configurable).
-- Formatea tablas (`<a:tbl>`) con separadores `|`; fallback a texto plano si falla.
-- Tolerancia a fallos por slide: si una diapositiva falla, continúa con las demás.
-- Reutiliza `truncateDocument` de `attachment.service.js` sin duplicar lógica.
-
-### Migración incremental
-Los extractores existentes (PDF, DOCX, XLSX) permanecen en `attachment.service.js` hasta que haya una razón real para moverlos. No big bang.
-
-### Impacto
-Base preparada para agregar `pdf.extractor.js`, `docx.extractor.js`, etc. en el futuro.
+- Extrae notas del presentador de `ppt/notesSlides/notesSlideN.xml` (default ON).
+- Formatea tablas (`<a:tbl>`) con separadores `|`.
+- Tolerancia a fallos por slide.
+- Reutiliza `truncateDocument` de `attachment.service.js`.
 
 ---
 
@@ -239,13 +233,10 @@ Soportar tres perfiles de calidad de modelo GGUF: Q4 (rápido), Q5 (equilibrado)
 ### Decisión
 Crear `services/mode.router.js` como módulo independiente que detecta el modo de respuesta por mensaje.
 
-### Razón
-La detección binaria anterior no cubría casos mixtos ni adjuntos no-código. Separar la lógica en su propio archivo permite testearla y extenderla sin tocar el controller.
-
 ### Arquitectura
 - `mode.router.js` — `detectMode({ rawMessage, files, configMode })` → `{ mode, variant, reason }`
 - `chat.controller.js` — llama al router, aplica prefijo según `variant`, pasa `mode` a `streamOptions`
-- `localai.service.js` — pasa `options.mode` a `getMaxTokens`
+- `localai.service.js` — pasa `options.mode` a `buildSystemPrompt` y `getMaxTokens`
 - `token.profiles.js` — `getMaxTokens` acepta `'coder'|'explain'|'general'|'continue'`
 
 ### Heurística (orden de prioridad)
@@ -259,8 +250,88 @@ La detección binaria anterior no cubría casos mixtos ni adjuntos no-código. S
 8. Solo trigger de código → `coder/strict`
 9. Default → `general`
 
+---
+
+## 🧱 Sistema de prompts por capas (v1.3.0)
+
+### Decisión
+Crear `backend/config/buildSystemPrompt.js` como orquestador que ensambla el system prompt dinámicamente desde archivos de texto separados.
+
+### Razón
+Antes, el system prompt era una cadena hardcodeada en `localai.service.js` o en un archivo JS. Cualquier cambio de comportamiento requería editar código. Con el sistema por capas, el comportamiento del asistente se configura editando archivos `.txt` sin tocar código.
+
+### Estructura
+```text
+backend/config/
+├── buildSystemPrompt.js          ← exporta buildSystemPrompt({ fullMemory, mode, variant, userId, projectId })
+└── prompts/
+    ├── global.system.txt         ← Capa 1: siempre presente
+    ├── modes/
+    │   ├── general.txt
+    │   ├── coder.strict.txt
+    │   ├── coder.hybrid.txt
+    │   └── explain.txt
+    └── loaders/
+        ├── global.loader.js
+        ├── mode.loader.js
+        ├── project.loader.js
+        └── prompt.builder.js
+```
+
+### Capas
+1. **global** — identidad, idioma, restricciones base. Siempre presente.
+2. **mode** — instrucciones específicas del modo detectado.
+3. **project** — memoria del proyecto activo (opcional).
+
 ### Impacto
-Respuestas más precisas según intención. Tokens ajustados automáticamente al modo.
+- Cambios de comportamiento sin tocar código.
+- Cada modo tiene su propio archivo, fácil de ajustar de forma independiente.
+- Base preparada para que el usuario configure su propio prompt de proyecto desde la UI.
+
+---
+
+## 🌡️ Estabilización del modelo Hermes Q4 (v1.3.0)
+
+### Decisión
+Reemplazar `temperature: 0` por `temperature: 0.35` + `mirostat: 2` + `repeat_penalty: 1.18`.
+
+### Razón
+`temperature: 0` con modelos Q4 cuantizados produce token trapping — el modelo queda atrapado en la secuencia más probable y la repite infinitamente. Mirostat controla la entropía dinámicamente evitando tanto la degeneración como la incoherencia.
+
+### Impacto
+Respuestas estables sin loops. Ver `MODELS.md` para la lista completa de problemas resueltos.
+
+---
+
+## 📋 Template ChatML para Hermes-3 (v1.3.0)
+
+### Decisión
+Usar template ChatML con `{{if .System}}` para los modelos Hermes-3.
+
+### Razón
+Hermes-3-Llama-3.1-8B fue afinado usando formato ChatML aunque el modelo base sea Llama 3.1 Instruct. Se probó el template Llama 3 Instruct y produjo respuestas vacías, generación de solo 8 tokens, y el modelo generaba el nombre del archivo en lugar del contenido. ChatML produce código completo, respuestas en español y terminación correcta.
+
+El `{{if .System}}` es necesario porque `generateTitleFromText` no manda system prompt — sin el condicional LocalAI lanza un error de template.
+
+### Impacto
+Generación de código funcional, respuestas completas en el idioma correcto, terminación limpia con `<|im_end|>`.
+
+---
+
+## 🛡️ Defensas activas contra comportamiento degenerativo (v1.3.0)
+
+### Decisión
+Implementar tres capas de defensa en `localai.service.js`:
+
+1. **processedMessage** — contextualiza mensajes cortos ambiguos para que el modelo no entre en modo autocompletion.
+2. **isUsefulMessage** — filtra mensajes genéricos del historial para reducir ruido en el contexto.
+3. **Detector de loops en streaming** — corta el stream en tiempo real cuando detecta repetición de n-gramas.
+
+### Razón
+El modelo Q4 con poca información semántica tiende a generar respuestas degenerativas. Una palabra sola como `tepic` es ambigua — el modelo no sabe si debe completar texto, listar, o hablar del tema. El historial con mensajes genéricos (`hola`, `cómo estás`) consume tokens de contexto sin aportar información útil.
+
+### Impacto
+El modelo responde correctamente a palabras sueltas y frases cortas. Los loops se cortan antes de llegar al usuario.
 
 ---
 
@@ -270,8 +341,8 @@ Respuestas más precisas según intención. Tokens ajustados automáticamente al
 Reemplazar texto por íconos SVG inline en los botones de acción por mensaje y en el botón de copiar de bloques de código.
 
 ### Impacto
-- Botones visibles solo al hacer hover sobre el mensaje (`opacity: 0` → `opacity: 1`).
-- `user-select: none` en `.message-actions` evita que los botones se incluyan al seleccionar texto.
+- Botones visibles solo al hacer hover (`opacity: 0` → `opacity: 1`).
+- `user-select: none` evita que los botones se incluyan al seleccionar texto.
 - Ícono cambia a checkmark al copiar y vuelve al original tras 1.5s.
 
 ---
@@ -291,9 +362,6 @@ Cambiar el layout del input de grid a flexbox con dos secciones: textarea arriba
 └─────────────────────────────────┘
 ```
 
-### Impacto
-Layout estable sin importar el tamaño del texto. Botones siempre accesibles.
-
 ---
 
 ## 🌊 Streaming de respuesta con SSE
@@ -304,9 +372,6 @@ Implementar streaming de respuesta usando Server-Sent Events (SSE) en el backend
 ### Problema resuelto: tokens especiales de Hermes
 LocalAI con modelos Hermes envía tokens especiales letra por letra. La solución fue limpiarlos en `finalizeStreamingBubble` sobre el `fullText` acumulado, usando `sanitize.js` como fuente de verdad.
 
-### Impacto
-Experiencia de usuario significativamente mejor. El texto aparece de forma progresiva.
-
 ---
 
 ## 🧹 sanitize.js — capa centralizada de post-procesado
@@ -314,53 +379,43 @@ Experiencia de usuario significativamente mejor. El texto aparece de forma progr
 ### Decisión
 Crear `backend/utils/sanitize.js` con `sanitizeModelOutput(text, options?)` como función pura sin dependencias externas.
 
-### Razón
-`cleanReply.js` y `finalizeStreamingBubble` duplicaban la limpieza de stop tokens de Hermes. Sin un punto centralizado, cada nuevo tipo de basura del modelo requería cambios en múltiples archivos.
-
 ### Arquitectura
-- `sanitize.js`: fuente de verdad — stop tokens, prefijos internos filtrados, ruido del modelo, normalización whitespace.
-- `cleanReply.js`: wrapper legacy que llama `sanitizeModelOutput()` para mantener compatibilidad con todo lo que ya lo importa.
-- `ui.js`: airbag visual independiente — no confía ciegamente en backend porque el frontend renderiza durante el stream, antes de que backend guarde en historial.
+- `sanitize.js`: fuente de verdad.
+- `cleanReply.js`: wrapper legacy para compatibilidad.
+- `ui.js`: airbag visual independiente.
 
 ### Opciones
 ```js
 sanitizeModelOutput(text, {
-  stripStopTokens: true,           // <|im_end|>, <|eot_id|>, etc.
-  stripInternalInstructions: true, // prefijos filtrados al final del texto
-  stripModelNoise: true,           // "assistant", ":" al inicio
-  normalizeWhitespace: true        // trim
+  stripStopTokens: true,
+  stripInternalInstructions: true,
+  stripModelNoise: true,
+  normalizeWhitespace: true
 })
 ```
-
-### Impacto
-Un solo lugar para agregar nuevos patrones de limpieza. Reutilizable en tests, Electron, o cualquier superficie futura.
 
 ---
 
 ## 🔒 Separación mensaje al modelo vs mensaje al historial
 
 ### Decisión
-En `chat.controller.js`, separar `finalMessage` (con prefijo de instrucción, va al modelo) de `historialMessage` (sin prefijo, se guarda en memoria). `detectUserData` también recibe el mensaje limpio.
+En `chat.controller.js`, separar `finalMessage` (con prefijo, va al modelo) de `historialMessage` (sin prefijo, se guarda en memoria).
 
 ### Razón
-El prefijo interno (`"Responde SOLO con texto explicativo..."`) se guardaba en `chatHistory`. El modelo lo veía reciclado en cada turno siguiente, aprendiendo a repetirlo en sus respuestas. Además `detectUserData` recibía texto contaminado con instrucciones internas.
+El prefijo interno se guardaba en `chatHistory` y el modelo lo veía reciclado en cada turno siguiente, aprendiendo a repetirlo.
 
 ### Impacto
-- Historial limpio: el modelo no ve prefijos internos en conversaciones anteriores.
-- `detectUserData` recibe solo el mensaje real del usuario.
-- El airbag visual en frontend actúa como segunda capa de defensa para casos donde el modelo igual repita algo.
+Historial limpio. `detectUserData` recibe solo el mensaje real del usuario.
 
 ---
 
 ## 🔮 Decisiones futuras
 
-- Implementar LibreOffice headless desde Node para mejor calidad de extracción.
-- Orden real de slides PPTX leyendo `ppt/presentation.xml` (v2 del extractor).
-- **Modo híbrido de modelos:** LocalAI con Qwen2.5-Coder-14B para código rutinario, Claude API / OpenAI API para arquitectura compleja.
+- Implementar LibreOffice headless para mejor calidad de extracción.
+- Orden real de slides PPTX leyendo `ppt/presentation.xml`.
+- Modo híbrido de modelos: LocalAI para código rutinario, API externa para arquitectura compleja.
 - Migrar memoria JSON a base de datos.
 - Añadir login real.
 - Añadir resumen automático por chat/proyecto.
 - Añadir embeddings para búsqueda semántica.
-- Añadir `confidence` al router de modos cuando haya datos reales para calibrarlo.
-- Ordenar chats por fecha de último mensaje.
-- Mostrar opciones de acción al seleccionar texto manualmente.
+- UI para editar el prompt de proyecto desde la pantalla de configuración del proyecto.

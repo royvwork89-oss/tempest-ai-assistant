@@ -4,15 +4,23 @@ model: Hermes-3-Llama-3.2-3B-Q4_K_M.gguf
 
 threads: 6
 context_size: 4096
+f16: true
+gpu-layers: 35
 
 parameters:
   model: Hermes-3-Llama-3.2-3B-Q4_K_M.gguf
-  temperature: 0
+  temperature: 0.35
   top_p: 0.9
-  max_tokens: 1000
-  stopwords:
-    - "<|im_end|>"
-    - "<|end_of_text|>"
+  mirostat: 2
+  mirostat_tau: 4.5
+  mirostat_eta: 0.1
+  repeat_penalty: 1.18
+
+stopwords:
+  - "<|eot_id|>"
+  - "<|end_of_text|>"
+  - "¿Hay algo más"
+  - "¿Hay algún"
 
 template:
   chatMessage: |

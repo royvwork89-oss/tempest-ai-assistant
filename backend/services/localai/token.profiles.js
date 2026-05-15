@@ -1,15 +1,15 @@
 const HARDWARE_TOKEN_PROFILES = {
   laptop: {
-    default:             { normal: 500, code: 900,  continue: 900  },
-    'qwen2.5-3b-q4':    { normal: 500, code: 900,  continue: 900  },
-    'qwen2.5-3b-q5':    { normal: 600, code: 1000, continue: 1000 },
-    'llama-3.2-3b-q4':  { normal: 600, code: 1000, continue: 1000 }
+    default: { normal: 500, code: 900, continue: 900 },
+    'qwen2.5-3b-q4': { normal: 500, code: 900, continue: 900 },
+    'qwen2.5-3b-q5': { normal: 600, code: 1000, continue: 1000 },
+    'llama-3.2-3b-q4': { normal: 600, code: 1000, continue: 1000 }
   },
   desktop: {
-    default:             { normal: 400,  code: 800,  continue: 800  },
-    'hermes-q4':         { normal: 400,  code: 700,  continue: 700  },
-    'hermes-q5':         { normal: 500,  code: 800,  continue: 800  },
-    'hermes-q6':         { normal: 600,  code: 900,  continue: 900  }
+    default: { normal: 400, code: 1200, continue: 1200 },
+    'hermes-q4': { normal: 400, code: 1200, continue: 1200 },
+    'hermes-q5': { normal: 500, code: 1400, continue: 1400 },
+    'hermes-q6': { normal: 600, code: 1600, continue: 1600 }
   }
 };
 

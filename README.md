@@ -4,6 +4,20 @@ Tempest es un asistente local de IA construido con Node.js, Express, LocalAI y f
 
 ---
 
+## 📚 Documentación del proyecto
+
+| Archivo | Contenido |
+|---------|-----------|
+| `README.md` | Este archivo — visión general, características, cómo ejecutar |
+| `ARCHITECTURE.md` | Componentes, estructura de carpetas, flujos internos |
+| `DECISIONS.md` | Decisiones técnicas y su justificación |
+| `FLOW.md` | Flujos detallados de cada función del sistema |
+| `MEMORY.md` | Sistema de memoria jerárquica |
+| `MODELS.md` | ⚠️ **Lectura obligatoria antes de tocar LocalAI** — configuración de modelos GGUF, problemas conocidos, qué NO cambiar |
+| `ROADMAP.md` | Estado del proyecto, versiones completadas, pendientes |
+
+---
+
 ## 🧠 Características principales
 
 ### 💬 Chat con IA local
@@ -11,74 +25,61 @@ Tempest es un asistente local de IA construido con Node.js, Express, LocalAI y f
 - Comunicación con modelos vía LocalAI.
 - Interfaz tipo ChatGPT.
 - **Streaming de respuesta** — el texto aparece palabra por palabra mientras el modelo genera.
-- Chats independientes.
-- Chats agrupados por proyecto.
+- Chats independientes y agrupados por proyecto.
 - Historial persistente por chat.
 - **Router de modos automático** — detecta si el mensaje es `coder`, `explain` o `general` y ajusta instrucciones y tokens.
 
 ### 🤖 Router de modos
 
 - `coder/strict` — código puro: implementaciones, endpoints, archivos.
-- `coder/hybrid` — explicación breve + código: cuando el usuario pide ambas cosas.
-- `explain` — texto explicativo sin código: conceptos, definiciones, análisis de documentos.
+- `coder/hybrid` — explicación breve + código.
+- `explain` — texto explicativo sin código.
 - `general` — conversación normal.
 - Detección automática por heurística (triggers + tipo de adjunto).
 - Override manual desde el frontend via `config.mode`.
+
+### 🧱 Sistema de prompts por capas (v1.3.0)
+
+El system prompt se construye dinámicamente en `backend/config/buildSystemPrompt.js` ensamblando tres capas:
+
+```text
+backend/config/prompts/
+├── global.system.txt        ← identidad, idioma, restricciones base
+├── modes/
+│   ├── general.txt          ← instrucciones para conversación general
+│   ├── coder.strict.txt     ← instrucciones para modo código estricto
+│   ├── coder.hybrid.txt     ← instrucciones para modo código híbrido
+│   └── explain.txt          ← instrucciones para modo explicación
+└── loaders/
+    ├── global.loader.js
+    ├── mode.loader.js
+    ├── project.loader.js
+    └── prompt.builder.js
+```
+
+Cada capa se puede modificar de forma independiente sin tocar el código. Ver `ARCHITECTURE.md` para el flujo completo.
 
 ### 📎 Archivos adjuntos
 
 - Soporte para múltiples archivos por mensaje (hasta 8, máx 10MB cada uno).
 - Drag & drop sobre el chat o el área de input.
-- Preview visual con chips (imagen, nombre, botón de eliminar).
-- Extracción de texto e inyección al contexto de LocalAI.
-- Tipos soportados:
-  - **Texto/código**: TXT, MD, HTML, CSS, JS, TS, JSX, TSX, JSON, YAML, XML, CSV, PY, JAVA, C, CPP, H, CS, PHP, RB, GO, RS, SH, BASH, ENV, INI, TOML, SQL
-  - **Documentos**: PDF (pdf2json), DOCX (mammoth), XLSX (xlsx), PPTX (unzipper + XML)
-  - **Imágenes**: PNG, JPG, GIF, WEBP (placeholder con metadata)
+- Tipos soportados: TXT, MD, HTML, CSS, JS, TS, JSX, TSX, JSON, YAML, XML, CSV, PY, JAVA, C, CPP, H, CS, PHP, RB, GO, RS, SH, BASH, ENV, INI, TOML, SQL, PDF, DOCX, XLSX, PPTX, imágenes.
 - Truncado inteligente diferenciado por tipo.
 - Limpieza automática de temporales en doble capa.
-- Arquitectura modular de extractores — contrato estándar `{ name, type, content, truncated, original, meta? }`.
 
 ### 🧹 Sanitización de salidas del modelo
 
 - `sanitize.js` — función pura centralizada, fuente de verdad para toda la limpieza.
-- Limpia stop tokens de Hermes, prefijos internos filtrados, ruido del modelo.
 - `cleanReply.js` actúa como wrapper legacy para compatibilidad.
 - Airbag visual en `finalizeStreamingBubble` — capa independiente en frontend.
 
 ### 🧠 Sistema de memoria
 
-- Memoria global de usuario.
-- Memoria por proyecto.
-- Memoria individual por chat.
+- Memoria global de usuario (`profile.json`).
+- Memoria por proyecto (`projectMemory.json`).
+- Memoria individual por chat (`chatId.json`).
 - Historial limpio — los prefijos internos del modo no se guardan en `chatHistory`.
-- Separación de contexto para evitar mezcla de conversaciones.
-- Persistencia en archivos JSON.
-
-### 📁 Organización por proyectos
-
-```text
-+ Nuevo Chat
-chat independiente
-
-+ Nuevo Proyecto
-proyecto
-└── chat del proyecto
-```
-
-### 🏷️ Renombrado inteligente
-
-- La primera consulta genera automáticamente el nombre del chat usando IA.
-- Generador de títulos optimizado: más rápido, limpia bloque de adjuntos, maneja mensajes solo con archivos.
-- Los proyectos se nombran manualmente al crearlos.
-- Cada chat/proyecto puede renombrarse desde un modal visual propio.
-- Validación de nombres: sin caracteres inválidos, mínimo 2 caracteres, máximo 60.
-
-### 🗑️ Eliminación segura
-
-- Menú de tres puntos con opciones Renombrar / Eliminar.
-- Modal de confirmación propio.
-- Modo selección para eliminar múltiples chats independientes.
+- El modelo recibe los últimos 2 mensajes del historial filtrados por `isUsefulMessage`.
 
 ### 🎙️ Transcripción de audio
 
@@ -88,24 +89,8 @@ proyecto
 
 ### 🖥️ Renderizado de código
 
-- Bloques de código estilo terminal con etiqueta de lenguaje y botón de copiar (ícono SVG).
+- Bloques de código estilo terminal con etiqueta de lenguaje y botón de copiar.
 - Separación automática de múltiples archivos en bloques individuales.
-- Detección de formatos: triple backtick y patrones `Archivo: nombre.ext` en texto plano.
-
-### 💬 Acciones por mensaje
-
-- Íconos SVG estilo Claude/ChatGPT — sin texto, solo símbolos.
-- Aparecen al hacer hover sobre el mensaje.
-- `user-select: none` — al seleccionar texto del chat los botones no se incluyen en la selección.
-- Acciones: copiar, editar (futuro), compartir (futuro), reintentar (futuro).
-
-### ⌨️ Área de entrada
-
-- Textarea autoexpandible con límite de altura.
-- Input multilínea con `Shift + Enter`.
-- Botón `+` fijo a la izquierda (menú de herramientas).
-- Botón enviar (ícono avión de papel) fijo a la derecha.
-- Barra de botones siempre visible debajo del textarea.
 
 ---
 
@@ -113,7 +98,12 @@ proyecto
 
 ```text
 backend/
-├── config/systemPrompt.js
+├── config/
+│   ├── buildSystemPrompt.js       ← orquestador del sistema de prompts por capas
+│   └── prompts/
+│       ├── global.system.txt      ← prompt base global
+│       ├── modes/                 ← prompts por modo
+│       └── loaders/               ← cargadores de cada capa
 ├── controllers/
 │   ├── chat.controller.js
 │   └── transcription.controller.js
@@ -122,17 +112,15 @@ backend/
 │   └── transcription.routes.js
 ├── services/
 │   ├── attachment.service.js
-│   ├── attachment/
-│   │   └── extractors/
-│   │       └── pptx.extractor.js
+│   ├── attachment/extractors/pptx.extractor.js
 │   ├── localai.service.js
+│   ├── localai/
+│   │   ├── memory.answers.js
+│   │   ├── response.validator.js
+│   │   └── token.profiles.js
 │   ├── memory.service.js
 │   ├── mode.router.js
-│   ├── transcription.service.js
-│   └── localai/
-│       ├── memory.answers.js
-│       ├── response.validator.js
-│       └── token.profiles.js
+│   └── transcription.service.js
 ├── utils/
 │   ├── cleanReply.js
 │   └── sanitize.js
@@ -149,6 +137,14 @@ frontend/
 ├── ui.js
 ├── index.html
 └── styles.css
+
+models-localai/
+├── hermes-q4.yaml    ← desktop, modelo principal
+├── hermes-q5.yaml    ← desktop, equilibrado
+├── hermes-q6.yaml    ← desktop, calidad
+├── llama-3.2-3b-q4.yaml  ← laptop
+├── qwen2.5-3b-q4.yaml    ← laptop
+└── qwen2.5-3b-q5.yaml    ← laptop
 ```
 
 ---
@@ -175,12 +171,14 @@ POST /transcribe
 ## ⚙️ Tecnologías utilizadas
 
 - Node.js + Express
-- LocalAI + modelos GGUF (Q4, Q5, Q6)
-- Whisper vía LocalAI
-- ffmpeg
-- JavaScript vanilla
-- pdf2json, mammoth, xlsx, unzipper
-- PDFKit, docx
+- LocalAI v2.24 + modelos GGUF (Hermes-3 Q4/Q5/Q6 para desktop, Llama 3.2 3B / Qwen2.5 3B para laptop)
+- Docker + docker-compose para LocalAI
+- GPU: RTX 4070 (desktop) con `gpu-layers: 99`
+- Whisper vía LocalAI para transcripción
+- ffmpeg para procesamiento de audio
+- JavaScript vanilla en frontend
+- pdf2json, mammoth, xlsx, unzipper para extracción de documentos
+- PDFKit, docx para exportación
 - SSE (Server-Sent Events) para streaming
 
 ---
@@ -196,20 +194,23 @@ npm install
 
 ### 2. Ejecutar LocalAI
 
-```text
+```bash
 cd docker
 docker-compose up
 ```
 
+Esperar a ver `INF LocalAI API is listening!` antes de continuar.
+
 ### 3. Ejecutar backend
 
 ```bash
+cd backend
 node server.js
 ```
 
 ### 4. Abrir frontend
 
-```text
+```
 http://localhost:3005
 ```
 
@@ -217,43 +218,46 @@ http://localhost:3005
 
 ## ⚠️ Requisitos
 
-- Node.js
+- Node.js v18+
+- Docker Desktop con WSL2
 - ffmpeg instalado y en PATH
-- Docker/LocalAI funcionando
-- Modelo de chat configurado (Q4, Q5 o Q6)
-- Modelo Whisper configurado para transcripción
+- GPU NVIDIA con drivers actualizados (para desktop)
+- Modelos GGUF descargados en `models-localai/`
+
+---
+
+## ⚠️ Antes de modificar LocalAI
+
+Leer `MODELS.md` primero. Contiene los problemas conocidos con Hermes-3 Q4 y lo que NO se debe cambiar. Ignorar este documento causará regresiones que tomaron muchas horas resolver.
 
 ---
 
 ## 🧠 Estado del proyecto
 
-Versión actual: **v1.2.0**
+Versión actual: **v1.3.0**
 
 Tempest cuenta con:
 
-- Chat local funcional con memoria por usuario/proyecto/chat
-- **Streaming de respuesta** — texto aparece palabra por palabra
-- **Router de modos automático** — `coder/strict`, `coder/hybrid`, `explain`, `general`
-- **Adjuntos PPTX** — extractor modular con notas del presentador, tablas y tolerancia a fallos
-- **sanitize.js** — capa centralizada de post-procesado de salidas del modelo
-- **Historial limpio** — prefijos internos no se guardan en memoria
-- **Airbag visual** en frontend — capa independiente de limpieza antes de renderizar
-- Sidebar con proyectos y chats
-- Modal propio para renombrar con validación inline
-- Validación de nombres para caracteres inválidos
-- Eliminar chats y proyectos con modal de confirmación
-- Generación automática de títulos de chat
-- Renombrado de chat cuando el primer mensaje es solo archivo adjunto
-- Transcripción de audio con exportación TXT/PDF/DOCX
-- Renderizado de bloques de código estilo terminal
-- Separación automática de múltiples archivos en bloques individuales
-- Botones de acción por mensaje con íconos SVG
-- Acciones visibles solo al hacer hover, sin interferir con selección de texto
-- Botón enviar con ícono de avión de papel dentro del área de entrada
-- Adjuntos funcionales: PDF, DOCX, XLSX, PPTX, TXT, código, imágenes
-- Modelos Q4, Q5 y Q6 funcionando
-- Historial de conversación sin duplicados
-- Manejo de errores visual — toast de sistema + burbuja de error en chat
+- ✅ Chat local funcional con memoria por usuario/proyecto/chat
+- ✅ **Streaming de respuesta** — texto aparece palabra por palabra
+- ✅ **Router de modos automático** — `coder/strict`, `coder/hybrid`, `explain`, `general`
+- ✅ **Sistema de prompts por capas** — global + modo + proyecto, modificables sin tocar código
+- ✅ **GPU activa** — RTX 4070 con `gpu-layers: 99`, respuestas en < 1 segundo
+- ✅ **Estabilización del modelo** — mirostat, temperature correcta, detector de loops, startup buffer
+- ✅ **Adjuntos PPTX** — extractor modular con notas del presentador, tablas y tolerancia a fallos
+- ✅ **sanitize.js** — capa centralizada de post-procesado de salidas del modelo
+- ✅ **Historial limpio** — prefijos internos no se guardan en memoria
+- ✅ **Airbag visual** en frontend — capa independiente de limpieza antes de renderizar
+- ✅ Sidebar con proyectos y chats
+- ✅ Modal propio para renombrar con validación inline
+- ✅ Eliminar chats y proyectos con modal de confirmación
+- ✅ Generación automática de títulos de chat
+- ✅ Transcripción de audio con exportación TXT/PDF/DOCX
+- ✅ Renderizado de bloques de código estilo terminal
+- ✅ Separación automática de múltiples archivos en bloques individuales
+- ✅ Botones de acción por mensaje con íconos SVG
+- ✅ Adjuntos funcionales: PDF, DOCX, XLSX, PPTX, TXT, código, imágenes
+- ✅ Manejo de errores visual — toast de sistema + burbuja de error en chat
 
 ---
 

@@ -407,6 +407,18 @@ body {
   transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
 
+.code-header .copy-btn {
+  background: transparent !important;
+  border: 1px solid transparent !important;
+  color: #64748b !important;
+}
+
+.code-header .copy-btn:hover {
+  background: rgba(51, 65, 85, 0.8) !important;
+  color: #e2e8f0 !important;
+  border-color: rgba(148, 163, 184, 0.2) !important;
+}
+
 .copy-btn:hover {
   background: #1e293b !important;
   color: #e2e8f0 !important;
