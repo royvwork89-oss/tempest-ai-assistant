@@ -42,7 +42,7 @@ async function sendToLocalAI(message, options = DEFAULT_MEMORY_OPTIONS) {
 
   let processedMessage = message.trim();
   const cleanedMsg = processedMessage.replace(/[¿?¡!]/g, '').trim();
-  const preguntaWords = /^(cual|como|que|por que|cuando|donde|quien|cuanto|cuales|cómo|qué|cuándo|dónde|quién|cuánto|dime|explica|habla)/i;
+  const preguntaWords = /^(cual|como|que|por que|cuando|donde|quien|cuanto|cuales|cómo|qué|cuándo|dónde|quién|cuánto|dime|explica|habla|genera|escribe|crea|haz|muestra|lista)/i;
   if (cleanedMsg.length > 3 && cleanedMsg.length <= 50 && !preguntaWords.test(cleanedMsg)) {
     processedMessage = `Háblame brevemente sobre: ${cleanedMsg}.`;
   } else if (cleanedMsg.length <= 2) {
@@ -68,7 +68,7 @@ async function sendToLocalAI(message, options = DEFAULT_MEMORY_OPTIONS) {
       model: options.primaryModel || 'hermes-q4',
       stream: false,
       temperature: 0.3,
-      stop: ['<|im_end|>', '<|im_start|>', '://', '\nUser:', '¿Hay algo más', '¿Hay algún'],
+      stop: ['<|im_end|>', '<|im_start|>', '://', '\nUser:', '¿Hay algo más', '¿Hay algún', '\ngenera una función'],
       max_tokens: getMaxTokens(options.primaryModel, message, options.mode || 'general', options.hardwareProfile || 'laptop'),
       messages
     })
@@ -104,7 +104,7 @@ async function sendToLocalAI(message, options = DEFAULT_MEMORY_OPTIONS) {
         model: options.primaryModel || 'hermes-q4',
         stream: false,
         temperature: 0.3,
-        stop: ['<|im_end|>', '<|im_start|>', '://', '\nUser:', '¿Hay algo más', '¿Hay algún'],
+        stop: ['<|im_end|>', '<|im_start|>', '://', '\nUser:', '¿Hay algo más', '¿Hay algún', '\ngenera una función'],
         max_tokens: getMaxTokens(options.primaryModel, message, 'continue', options.hardwareProfile || 'laptop'),
         messages: [
           ...messages,
@@ -236,7 +236,7 @@ async function* streamToLocalAI(message, options = DEFAULT_MEMORY_OPTIONS) {
 
   let processedMessage = message.trim();
   const cleanedMsg = processedMessage.replace(/[¿?¡!]/g, '').trim();
-  const preguntaWords = /^(cual|como|que|por que|cuando|donde|quien|cuanto|cuales|cómo|qué|cuándo|dónde|quién|cuánto|dime|explica|habla)/i;
+  const preguntaWords = /^(cual|como|que|por que|cuando|donde|quien|cuanto|cuales|cómo|qué|cuándo|dónde|quién|cuánto|dime|explica|habla|genera|escribe|crea|haz|muestra|lista)/i;
   if (cleanedMsg.length > 3 && cleanedMsg.length <= 50 && !preguntaWords.test(cleanedMsg)) {
     processedMessage = `Háblame brevemente sobre: ${cleanedMsg}.`;
   } else if (cleanedMsg.length <= 2) {
@@ -255,6 +255,7 @@ async function* streamToLocalAI(message, options = DEFAULT_MEMORY_OPTIONS) {
   let fullReply = '';
 
   try {
+    console.log('PROCESSED MESSAGE:', processedMessage);
     const response = await fetch('http://127.0.0.1:8080/v1/chat/completions', {
       method: 'POST',
       signal: controller.signal,
@@ -263,7 +264,7 @@ async function* streamToLocalAI(message, options = DEFAULT_MEMORY_OPTIONS) {
         model: options.primaryModel || 'hermes-q4',
         stream: true,
         temperature: 0.3,
-        stop: ['<|im_end|>', '<|im_start|>', '://', '\nUser:', '¿Hay algo más', '¿Hay algún'],
+        stop: ['<|im_end|>', '<|im_start|>', '://', '\nUser:', '¿Hay algo más', '¿Hay algún', '\ngenera una función'],
         max_tokens: getMaxTokens(options.primaryModel, message, options.mode || 'general', options.hardwareProfile || 'laptop'),
         messages
       })
@@ -308,7 +309,7 @@ async function* streamToLocalAI(message, options = DEFAULT_MEMORY_OPTIONS) {
 
           // Startup buffer — no emitir hasta tener contenido limpio
           if (!started) {
-            const cleaned = fullReply.replace(/^[:\s\/\\]+/, '');
+            const cleaned = fullReply.replace(/^[:\\\/]+/, '');
             if (cleaned.length < 1) continue;
             started = true;
             fullReply = cleaned;

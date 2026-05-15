@@ -21,9 +21,6 @@ stopwords:
   - "<|end_of_text|>"
   - "<|im_start|>"
   - "://"
-  - "\n```"
-  - "def "
-  - "class "
   - "¿Hay algo más"
   - "¿Hay algún"
 
