@@ -70,7 +70,7 @@
 
       <div id="typing" class="typing"></div>
 
-<footer class="chat-input-area">
+      <footer class="chat-input-area">
         <div class="input-wrapper">
           <div id="attachmentPreview" class="attachment-preview hidden"></div>
           <textarea id="userInput" placeholder="Escribe tu mensaje..." autocomplete="off" rows="1"></textarea>
@@ -89,7 +89,8 @@
             </div>
             <button id="sendBtn" class="send-btn" title="Enviar">
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M3.478 2.405a.75.75 0 0 0-.926.94l2.432 7.905H13.5a.75.75 0 0 1 0 1.5H4.984l-2.432 7.905a.75.75 0 0 0 .926.94 60.519 60.519 0 0 0 18.445-8.986.75.75 0 0 0 0-1.218A60.517 60.517 0 0 0 3.478 2.405z"/>
+                <path
+                  d="M3.478 2.405a.75.75 0 0 0-.926.94l2.432 7.905H13.5a.75.75 0 0 1 0 1.5H4.984l-2.432 7.905a.75.75 0 0 0 .926.94 60.519 60.519 0 0 0 18.445-8.986.75.75 0 0 0 0-1.218A60.517 60.517 0 0 0 3.478 2.405z" />
               </svg>
             </button>
           </div>
@@ -162,29 +163,47 @@
     </div>
   </div>
   <!-- Modal: Context Files del proyecto -->
-<div id="contextFilesModal" class="modal-overlay hidden">
-  <div class="modal-box modal-box--wide">
-    <h2>Archivos de contexto — <span id="contextFilesProjectName"></span></h2>
+  <div id="contextFilesModal" class="modal-overlay hidden">
+    <div class="modal-box modal-box--wide">
+      <h2>Archivos de contexto — <span id="contextFilesProjectName"></span></h2>
 
-    <div class="context-files-upload">
-      <label class="context-upload-label">
-        <input type="file" id="contextFileInput" multiple
-          accept=".txt,.md,.html,.css,.js,.ts,.jsx,.tsx,.json,.yaml,.yml,.xml,.csv,.py,.java,.c,.cpp,.h,.cs,.php,.rb,.go,.rs,.sh,.bash,.env,.ini,.toml,.sql,.pdf,.docx,.xlsx,.pptx"
-          style="display:none">
-        <button type="button" id="contextUploadBtn" class="btn-secondary">+ Subir archivos</button>
-      </label>
-      <span id="contextUploadStatus" class="context-upload-status"></span>
-    </div>
+      <div class="context-files-upload">
+        <label class="context-upload-label">
+          <input type="file" id="contextFileInput" multiple
+            accept=".txt,.md,.html,.css,.js,.ts,.jsx,.tsx,.json,.yaml,.yml,.xml,.csv,.py,.java,.c,.cpp,.h,.cs,.php,.rb,.go,.rs,.sh,.bash,.env,.ini,.toml,.sql,.pdf,.docx,.xlsx,.pptx"
+            style="display:none">
+          <button type="button" id="contextUploadBtn" class="btn-secondary">+ Subir archivos</button>
+        </label>
+        <span id="contextUploadStatus" class="context-upload-status"></span>
+      </div>
 
-    <div id="contextFilesList" class="context-files-list">
-      <p class="context-empty">No hay archivos de contexto. Sube archivos para que Tempest los use en este proyecto.</p>
-    </div>
+      <div id="contextFilesList" class="context-files-list">
+        <p class="context-empty">No hay archivos de contexto. Sube archivos para que Tempest los use en este proyecto.
+        </p>
+      </div>
 
-    <div class="modal-actions">
-      <button id="closeContextFilesBtn">Cerrar</button>
+      <div class="modal-actions">
+        <button id="closeContextFilesBtn">Cerrar</button>
+      </div>
     </div>
   </div>
-</div>
+
+  <!-- Modal: Configuración del proyecto -->
+  <div id="projectConfigModal" class="modal-overlay hidden">
+    <div class="modal-box modal-box--wide">
+      <h2>Configuración — <span id="projectConfigName"></span></h2>
+
+      <label for="projectPromptTextarea">Prompt personalizado del proyecto</label>
+      <textarea id="projectPromptTextarea" rows="10"
+        placeholder="Instrucciones específicas para este proyecto...&#10;Ej: Eres un experto en Django. Usa siempre TypeScript. Prefiere patrones REST..."></textarea>
+
+      <div class="modal-actions">
+        <button id="cancelProjectConfigBtn">Cancelar</button>
+        <button id="saveProjectConfigBtn">Guardar</button>
+      </div>
+    </div>
+  </div>
+
   <script type="module" src="app.js"></script>
 </body>
 

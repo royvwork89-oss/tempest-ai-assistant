@@ -251,3 +251,19 @@ export async function deleteContextItem(projectId, itemId) {
 
   return response.json();
 }
+
+// ─── Project Settings ───────────────────────────────────────────────────────
+
+export async function getProjectSettings(projectId) {
+  const res = await fetch(`/project/${encodeURIComponent(projectId)}/settings`);
+  return res.json();
+}
+
+export async function updateProjectSettings(projectId, updates) {
+  const res = await fetch(`/project/${encodeURIComponent(projectId)}/settings`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(updates)
+  });
+  return res.json();
+}

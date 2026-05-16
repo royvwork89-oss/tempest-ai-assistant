@@ -10,21 +10,22 @@ const USERS_DIR = path.join(__dirname, '../../../data/users');
  * @returns {string}
  */
 function loadProjectPrompt(userId, projectId) {
-  if (!userId || !projectId) return '';
+  if (!userId || !projectId || projectId === 'general') return '';
 
-  const promptPath = path.join(
+  const settingsPath = path.join(
     USERS_DIR,
     userId,
     'projects',
     projectId,
-    'project.system.txt'
+    'projectSettings.json'
   );
 
   try {
-    if (!fs.existsSync(promptPath)) return '';
-    return fs.readFileSync(promptPath, 'utf-8').trim();
+    if (!fs.existsSync(settingsPath)) return '';
+    const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
+    return String(settings?.prompts?.projectPromptText || '').trim();
   } catch (err) {
-    console.error(`[project.loader] No se pudo leer project.system.txt para ${projectId}:`, err.message);
+    console.error(`[project.loader] Error leyendo projectSettings.json para ${projectId}:`, err.message);
     return '';
   }
 }
