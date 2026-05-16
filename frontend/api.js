@@ -213,3 +213,41 @@ export async function generateDocument(prompt, format = 'txt', config = {}) {
 
   return response.json();
 }
+
+
+// ─── Context Files ─────────────────────────────────────────────────────────
+
+export async function listContextItems(projectId) {
+  const response = await fetch(`/project/${encodeURIComponent(projectId)}/context/items`);
+  return response.json();
+}
+
+export async function uploadContextFiles(projectId, files) {
+  const formData = new FormData();
+  Array.from(files).forEach(file => formData.append('files', file));
+
+  const response = await fetch(`/project/${encodeURIComponent(projectId)}/context/upload`, {
+    method: 'POST',
+    body: formData
+  });
+
+  return response.json();
+}
+
+export async function updateContextItem(projectId, itemId, changes) {
+  const response = await fetch(`/project/${encodeURIComponent(projectId)}/context/item/${encodeURIComponent(itemId)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(changes)
+  });
+
+  return response.json();
+}
+
+export async function deleteContextItem(projectId, itemId) {
+  const response = await fetch(`/project/${encodeURIComponent(projectId)}/context/item/${encodeURIComponent(itemId)}`, {
+    method: 'DELETE'
+  });
+
+  return response.json();
+}

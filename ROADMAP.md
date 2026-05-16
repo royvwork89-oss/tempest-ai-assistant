@@ -2,7 +2,7 @@
 
 ## 🚧 Estado actual
 
-Versión actual: **v1.3.0**
+Versión actual: **v1.4.0**
 
 Sistema funcional con:
 
@@ -39,6 +39,9 @@ Sistema funcional con:
 - Airbag visual en frontend
 - Streaming de respuesta
 - Manejo de errores visual — toast de sistema + burbuja de error en chat
+- **Context files por proyecto** — subida manual de archivos, gestión UI, inyección automática en prompt
+- **projectSettings.json** — configuración por proyecto (reglas de contexto, prompts)
+- **Migración automática** de proyectos existentes al nuevo sistema de context files
 
 ---
 
@@ -93,6 +96,28 @@ Sistema funcional con:
 - [x] `MODELS.md` — documentación crítica de configuración de modelos
 
 ---
+
+## 🎯 v1.4 — Context Files por proyecto ✅
+
+- [x] `projectSettings.json` — configuración por proyecto (reglas de contexto, prompts futuros)
+- [x] `context/index.json` — inventario de archivos de contexto por proyecto
+- [x] Providers + Assembler + Budgeter — arquitectura modular y expandible
+- [x] `upload.provider.js` — lee archivos subidos desde `context/files/`
+- [x] `fs.provider.js` — stub seguro para lectura de disco (v2/Electron)
+- [x] `budgeter.js` — presupuesto de contexto con orden de prioridad y truncado inteligente
+- [x] Deduplicación por hash SHA-256
+- [x] Endpoints REST: listar, subir, actualizar, eliminar, settings
+- [x] Inyección automática como Capa 4 del system prompt (`### CONTEXT: PROJECT FILES ###`)
+- [x] `buildSystemPrompt` pasa a `async` — integra contexto en cada request
+- [x] UI en sidebar — botón "Archivos de contexto" en menú de proyecto
+- [x] Modal de gestión — subir archivos, toggle activo/siempre, eliminar
+- [x] Script de migración para proyectos existentes (`scripts/migrate-projects.js`)
+- [x] `initProject` — inicializa estructura al crear proyectos nuevos
+
+---
+
+
+
 
 ## 🔥 Prioridad alta
 
@@ -179,6 +204,7 @@ Sistema funcional con:
 - [x] Capa 1: prompt base global
 - [x] Capa 2: prompt de modo (coder/explain/general)
 - [x] Capa 3: prompt de proyecto (desde projectMemory)
+- [x] Capa 4: context files del proyecto (desde context/index.json)
 - [ ] UI para editar el prompt de proyecto desde la pantalla de configuración
 
 ### 📸 Prioridad 3 — Context Snapshot del repo
@@ -199,8 +225,8 @@ Sistema funcional con:
 
 ## 📁 Context files por proyecto
 
-- [ ] Subida manual de archivos asociados a un proyecto
-- [ ] Lectura de carpeta del disco configurada por proyecto
+- [x] Subida manual de archivos asociados a un proyecto
+- [ ] Lectura de carpeta del disco configurada por proyecto (Electron/v2)
 - [ ] Pantalla de configuración inicial al crear proyecto
 
 ---
@@ -227,7 +253,8 @@ Sistema funcional con:
 
 ### 🧠 Contexto y comprensión del proyecto
 - [x] Context Snapshot del repo — `projectContext.json` con estructura, archivos relevantes, hash y mtime
-- [ ] Context files por proyecto — subida manual + lectura opcional de carpetas del disco
+- [x] Context files por proyecto — subida manual, gestión UI, inyección en prompt
+- [ ] Context files por proyecto — lectura de carpetas del disco (Electron/v2)
 - [ ] UI para configurar prompts de proyecto
 
 ### 🤖 Inteligencia y selección de modelos

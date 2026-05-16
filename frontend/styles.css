@@ -979,3 +979,224 @@ body {
 .error-toast-close:hover {
   opacity: 1;
 }
+
+/* ─── Context Files Modal ──────────────────────────────────────────────────── */
+
+.modal-box--wide {
+  width: 760px !important;
+  max-width: calc(100vw - 48px) !important;
+
+  min-width: 680px;
+
+  box-sizing: border-box;
+}
+
+
+.modal-box--wide .context-file-controls {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.context-files-upload {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.context-upload-status {
+  font-size: 13px;
+  color: var(--text-muted, #888);
+}
+
+.context-files-list {
+  max-height: 320px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  border: 1px solid var(--border, #333);
+  border-radius: 6px;
+  padding: 8px;
+  margin-bottom: 16px;
+}
+
+.context-empty {
+  color: var(--text-muted, #888);
+  font-size: 13px;
+  text-align: center;
+  padding: 24px 0;
+  margin: 0;
+}
+
+.context-file-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 6px;
+  border-bottom: 1px solid var(--border, #2a2a2a);
+  gap: 8px;
+  min-width: 0;
+}
+
+.context-file-row:last-child {
+  border-bottom: none;
+}
+
+.context-file-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.context-file-name {
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.context-file-size {
+  font-size: 11px;
+  color: var(--text-muted, #888);
+}
+
+.context-file-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  min-width: 110px;
+  justify-content: flex-start;
+
+  flex-shrink: 0;
+}
+
+.context-file-toggle input[type="checkbox"] {
+  margin: 0;
+}
+
+.context-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  cursor: pointer;
+  color: var(--text-muted, #aaa);
+  white-space: nowrap;
+}
+
+.context-file-delete {
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  background: none;
+  border: none;
+  color: var(--text-muted, #888);
+  cursor: pointer;
+  font-size: 14px;
+  border-radius: 6px;
+  transition: color 0.15s, background 0.15s;
+
+  flex-shrink: 0;
+  margin-left: 18px; 
+}
+
+.context-file-delete:hover {
+  color: #e05555;
+  background: rgba(224, 85, 85, 0.1);
+}
+
+.btn-secondary {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.08);
+
+  color: #f1f1f1;
+
+  padding: 10px 16px;
+  border-radius: 10px;
+
+  cursor: pointer;
+
+  font-size: 14px;
+  font-weight: 500;
+
+  transition:
+    background 0.18s ease,
+    border-color 0.18s ease,
+    transform 0.12s ease;
+
+  backdrop-filter: blur(6px);
+
+  white-space: nowrap;
+}
+
+.btn-secondary:hover {
+  background: rgba(255,255,255,0.10);
+  border-color: rgba(255,255,255,0.14);
+
+  transform: translateY(-1px);
+}
+
+.btn-secondary:active {
+  transform: scale(0.98);
+}
+
+.btn-secondary:hover {
+  background: var(--bg-hover, #333);
+}
+
+.context-toggle input[type="checkbox"] {
+  appearance: none;
+
+  width: 16px;
+  height: 16px;
+
+  border-radius: 5px;
+
+  border: 1px solid rgba(255,255,255,0.18);
+
+  background: rgba(255,255,255,0.05);
+
+  cursor: pointer;
+
+  position: relative;
+
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.context-toggle input[type="checkbox"]:checked {
+  background: #2f81f7;
+  border-color: #2f81f7;
+
+  box-shadow:
+    0 0 0 3px rgba(47,129,247,0.18);
+}
+
+.context-toggle input[type="checkbox"]:checked::after {
+  content: '';
+
+  position: absolute;
+
+  left: 4px;
+  top: 1px;
+
+  width: 4px;
+  height: 8px;
+
+  border: solid white;
+  border-width: 0 2px 2px 0;
+
+  transform: rotate(45deg);
+}

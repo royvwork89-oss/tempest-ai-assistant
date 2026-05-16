@@ -6,7 +6,11 @@ import {
   deleteProject,
   renameChat,
   renameProject,
-  getChatHistory
+  getChatHistory,
+  listContextItems,
+  uploadContextFiles,
+  updateContextItem,
+  deleteContextItem
 } from '../api.js';
 import { setActiveChat, getChatState } from '../chatState.js';
 import { addMessage } from '../ui.js';
@@ -17,7 +21,7 @@ function validateName(name) {
   if (/[\\/:*?"<>|]/.test(name)) return 'El nombre contiene caracteres no permitidos: \\ / : * ? " < > |';
   if (/^\./.test(name.trim())) return 'El nombre no puede empezar con un punto.';
   if (name.trim().length > 60) return 'El nombre es demasiado largo (máximo 60 caracteres).';
-  return null; // null = válido
+  return null;
 }
 
 let collapsedProjects = new Set();
@@ -78,8 +82,20 @@ export function createActionsMenu({ type, id, projectId }, { onLoadSidebar, onLo
     menu.classList.toggle('hidden');
   };
 
+  if (type === 'project') {
+    const contextBtn = document.createElement('button');
+    contextBtn.textContent = 'Archivos de contexto';
+    contextBtn.onclick = (event) => {
+      event.stopPropagation();
+      menu.classList.add('hidden');
+      openContextFilesModal(id);
+    };
+    menu.appendChild(contextBtn);
+  }
+
   menu.appendChild(renameBtn);
   menu.appendChild(deleteBtn);
+
   wrapper.appendChild(label);
   wrapper.appendChild(dots);
   wrapper.appendChild(menu);
@@ -289,7 +305,6 @@ export function openRenameModal({ type, id, projectId, onLoadSidebar }) {
   input.focus();
   input.select();
 
-  // Limpia listeners anteriores clonando los botones
   const newCancel = cancelBtn.cloneNode(true);
   const newConfirm = confirmBtn.cloneNode(true);
   cancelBtn.replaceWith(newCancel);
@@ -299,34 +314,166 @@ export function openRenameModal({ type, id, projectId, onLoadSidebar }) {
 
   newCancel.onclick = close;
 
-newConfirm.onclick = async () => {
-  const newName = input.value.trim();
-  if (!newName || newName === id) { close(); return; }
+  newConfirm.onclick = async () => {
+    const newName = input.value.trim();
+    if (!newName || newName === id) { close(); return; }
 
-  const error = validateName(newName);
-  if (error) {
-    const errorEl = modal.querySelector('.rename-modal-error') || (() => {
-      const el = document.createElement('p');
-      el.className = 'rename-modal-error';
-      input.insertAdjacentElement('afterend', el);
-      return el;
-    })();
-    errorEl.textContent = error;
-    return; // no cierra, deja al usuario corregir
-  }
+    const error = validateName(newName);
+    if (error) {
+      const errorEl = modal.querySelector('.rename-modal-error') || (() => {
+        const el = document.createElement('p');
+        el.className = 'rename-modal-error';
+        input.insertAdjacentElement('afterend', el);
+        return el;
+      })();
+      errorEl.textContent = error;
+      return;
+    }
 
-  const errorEl = modal.querySelector('.rename-modal-error');
-  if (errorEl) errorEl.remove();
+    const errorEl = modal.querySelector('.rename-modal-error');
+    if (errorEl) errorEl.remove();
 
-  if (type === 'chat') await renameChat(id, newName, projectId);
-  if (type === 'project') await renameProject(id, newName);
-  close();
-  await onLoadSidebar();
-};
+    if (type === 'chat') await renameChat(id, newName, projectId);
+    if (type === 'project') await renameProject(id, newName);
+    close();
+    await onLoadSidebar();
+  };
 
   input.onkeydown = async (e) => {
     if (e.key === 'Enter') newConfirm.onclick();
     if (e.key === 'Escape') close();
+  };
+}
+
+export async function openContextFilesModal(projectId) {
+  const modal = document.getElementById('contextFilesModal');
+  const projectName = document.getElementById('contextFilesProjectName');
+  const list = document.getElementById('contextFilesList');
+  const uploadBtn = document.getElementById('contextUploadBtn');
+  const fileInput = document.getElementById('contextFileInput');
+  const uploadStatus = document.getElementById('contextUploadStatus');
+  const closeBtn = document.getElementById('closeContextFilesBtn');
+
+  projectName.textContent = projectId;
+  modal.classList.remove('hidden');
+
+  async function renderItems() {
+    list.innerHTML = '';
+    uploadStatus.textContent = '';
+
+    let items = [];
+    try {
+      const res = await listContextItems(projectId);
+      items = res.items || [];
+    } catch (err) {
+      list.innerHTML = '<p class="context-empty">Error al cargar archivos.</p>';
+      return;
+    }
+
+    if (items.length === 0) {
+      list.innerHTML = '<p class="context-empty">No hay archivos de contexto. Sube archivos para que Tempest los use en este proyecto.</p>';
+      return;
+    }
+
+    items.forEach(item => {
+      const row = document.createElement('div');
+      row.className = 'context-file-row';
+
+      const info = document.createElement('div');
+      info.className = 'context-file-info';
+
+      const name = document.createElement('span');
+      name.className = 'context-file-name';
+      name.textContent = item.name;
+
+      const size = document.createElement('span');
+      size.className = 'context-file-size';
+      size.textContent = item.sizeBytes ? `${(item.sizeBytes / 1024).toFixed(1)} KB` : '';
+
+      info.appendChild(name);
+      info.appendChild(size);
+
+      const controls = document.createElement('div');
+      controls.className = 'context-file-controls';
+
+      const enabledLabel = document.createElement('label');
+      enabledLabel.className = 'context-toggle';
+      const enabledCheck = document.createElement('input');
+      enabledCheck.type = 'checkbox';
+      enabledCheck.checked = item.enabled;
+      enabledCheck.onchange = async () => {
+        await updateContextItem(projectId, item.id, { enabled: enabledCheck.checked });
+      };
+      enabledLabel.appendChild(enabledCheck);
+      enabledLabel.appendChild(document.createTextNode(' activo'));
+
+      const alwaysLabel = document.createElement('label');
+      alwaysLabel.className = 'context-toggle';
+      const alwaysCheck = document.createElement('input');
+      alwaysCheck.type = 'checkbox';
+      alwaysCheck.checked = item.alwaysInclude;
+      alwaysCheck.onchange = async () => {
+        await updateContextItem(projectId, item.id, { alwaysInclude: alwaysCheck.checked });
+      };
+      alwaysLabel.appendChild(alwaysCheck);
+      alwaysLabel.appendChild(document.createTextNode(' siempre'));
+      alwaysLabel.style.paddingRight = '4px';
+
+      const delBtn = document.createElement('button');
+      delBtn.className = 'context-file-delete';
+      delBtn.textContent = '✕';
+      delBtn.onclick = async () => {
+        await deleteContextItem(projectId, item.id);
+        await renderItems();
+      };
+
+      const enabledGroup = document.createElement('div');
+      enabledGroup.className = 'context-file-toggle';
+      enabledGroup.appendChild(enabledLabel);
+
+      const fixedGroup = document.createElement('div');
+      fixedGroup.className = 'context-file-toggle';
+      fixedGroup.appendChild(alwaysLabel);
+
+      controls.appendChild(enabledGroup);
+      controls.appendChild(fixedGroup);
+      controls.appendChild(delBtn);
+
+      row.appendChild(info);
+      row.appendChild(controls);
+      list.appendChild(row);
+    });
+  }
+
+  await renderItems();
+
+  uploadBtn.onclick = () => fileInput.click();
+
+  fileInput.onchange = async () => {
+    if (!fileInput.files.length) return;
+    uploadStatus.textContent = 'Subiendo...';
+    uploadBtn.disabled = true;
+
+    try {
+      const res = await uploadContextFiles(projectId, fileInput.files);
+      uploadStatus.textContent = res.added?.length
+        ? `✓ ${res.added.length} archivo(s) subido(s)`
+        : 'Sin cambios (posibles duplicados)';
+    } catch (err) {
+      uploadStatus.textContent = '✗ Error al subir archivos';
+    }
+
+    fileInput.value = '';
+    uploadBtn.disabled = false;
+    await renderItems();
+  };
+
+  const newClose = closeBtn.cloneNode(true);
+  closeBtn.replaceWith(newClose);
+  newClose.onclick = () => modal.classList.add('hidden');
+
+  modal.onclick = (e) => {
+    if (e.target === modal) modal.classList.add('hidden');
   };
 }
 

@@ -38,9 +38,9 @@ Tempest es un asistente local de IA construido con Node.js, Express, LocalAI y f
 - Detección automática por heurística (triggers + tipo de adjunto).
 - Override manual desde el frontend via `config.mode`.
 
-### 🧱 Sistema de prompts por capas (v1.3.0)
+### 🧱 Sistema de prompts por capas (v1.4.0)
 
-El system prompt se construye dinámicamente en `backend/config/buildSystemPrompt.js` ensamblando tres capas:
+El system prompt se construye dinámicamente en `backend/config/buildSystemPrompt.js` ensamblando cuatro capas:
 
 ```text
 backend/config/prompts/
@@ -87,6 +87,15 @@ Cada capa se puede modificar de forma independiente sin tocar el código. Ver `A
 - División automática en fragmentos.
 - Exportación a TXT, PDF y DOCX.
 
+### 📁 Context files por proyecto
+
+- Subida manual de archivos (PDF, DOCX, XLSX, PPTX, TXT, código) a un proyecto.
+- Los archivos se guardan de forma persistente y Tempest los usa como contexto en todos los chats del proyecto.
+- Toggle por archivo: **activo** (habilitado/deshabilitado) y **siempre** (incluir en cada mensaje sin importar lo que se pregunte).
+- Deduplicación automática por hash SHA-256.
+- Gestión desde el menú `⋯` del proyecto → "Archivos de contexto".
+- Separado de los adjuntos por mensaje — los context files persisten, los adjuntos son temporales.
+
 ### 🖥️ Renderizado de código
 
 - Bloques de código estilo terminal con etiqueta de lenguaje y botón de copiar.
@@ -106,13 +115,22 @@ backend/
 │       └── loaders/               ← cargadores de cada capa
 ├── controllers/
 │   ├── chat.controller.js
+│   ├── context.controller.js
 │   └── transcription.controller.js
 ├── routes/
 │   ├── chat.routes.js
+│   ├── context.routes.js
 │   └── transcription.routes.js
 ├── services/
 │   ├── attachment.service.js
 │   ├── attachment/extractors/pptx.extractor.js
+│   ├── context/
+│   │   ├── context.service.js
+│   │   ├── assembler.js
+│   │   ├── budgeter.js
+│   │   └── providers/
+│   │       ├── upload.provider.js
+│   │       └── fs.provider.js
 │   ├── localai.service.js
 │   ├── localai/
 │   │   ├── memory.answers.js
@@ -164,6 +182,12 @@ POST /project/delete
 POST /project/rename
 POST /title/generate
 POST /transcribe
+GET    /project/:projectId/context/items
+POST   /project/:projectId/context/upload
+PATCH  /project/:projectId/context/item/:id
+DELETE /project/:projectId/context/item/:id
+GET    /project/:projectId/settings
+PATCH  /project/:projectId/settings
 ```
 
 ---
@@ -234,7 +258,7 @@ Leer `MODELS.md` primero. Contiene los problemas conocidos con Hermes-3 Q4 y lo 
 
 ## 🧠 Estado del proyecto
 
-Versión actual: **v1.3.0**
+Versión actual: **v1.4.0**
 
 Tempest cuenta con:
 
@@ -258,6 +282,9 @@ Tempest cuenta con:
 - ✅ Botones de acción por mensaje con íconos SVG
 - ✅ Adjuntos funcionales: PDF, DOCX, XLSX, PPTX, TXT, código, imágenes
 - ✅ Manejo de errores visual — toast de sistema + burbuja de error en chat
+- ✅ **Context files por proyecto** — subida manual, gestión UI, inyección automática en prompt
+- ✅ **projectSettings.json** — configuración por proyecto (reglas de contexto, prompts)
+- ✅ **Migración automática** de proyectos existentes al nuevo sistema de context files
 
 ---
 

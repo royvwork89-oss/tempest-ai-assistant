@@ -5,7 +5,7 @@
 Tempest es un asistente local de IA con arquitectura cliente-servidor, frontend web, backend Node.js/Express, motor LocalAI y persistencia basada en archivos JSON.
 
 ```text
-Usuario → Frontend → Backend → Modo Router → Sistema de Prompts → Memoria/Servicios → LocalAI → Backend (SSE) → Frontend
+Usuario → Frontend → Backend → Modo Router → Sistema de Prompts → Memoria/Contexto/Servicios → LocalAI → Backend (SSE) → Frontend
 ```
 
 ---
@@ -32,20 +32,21 @@ Usuario → Frontend → Backend → Modo Router → Sistema de Prompts → Memo
 - **Botón enviar con ícono de avión de papel** dentro del área de entrada.
 - Validación de nombres de chats y proyectos.
 - **Airbag visual en `finalizeStreamingBubble`** — limpia stop tokens de Hermes y prefijos internos filtrados antes de renderizar.
+- **Modal de context files** — subir archivos al proyecto, toggle activo/siempre, eliminar.
 
 ### Backend
 
 - API REST con Express.
-- Controladores para chat y transcripción.
+- Controladores para chat, transcripción y **context files**.
 - **Streaming SSE** en `chat.controller.js` — usa `Content-Type: text/event-stream` y reenvía tokens con `res.write()`.
 - **Router de modos** en `services/mode.router.js` — detecta `coder/strict`, `coder/hybrid`, `explain`, `general`.
-- **Sistema de prompts por capas** en `config/buildSystemPrompt.js` — ensambla system prompt dinámicamente desde archivos de texto.
+- **Sistema de prompts por capas** en `config/buildSystemPrompt.js` — ensambla system prompt dinámicamente desde archivos de texto. Es `async` desde v1.4.0 para incluir la Capa 4.
 - **Separación mensaje al modelo vs historial** — `finalMessage` con prefijo va al modelo; `historialMessage` sin prefijo se guarda en memoria.
-- Servicios separados para LocalAI, memoria, transcripción y adjuntos.
+- Servicios separados para LocalAI, memoria, transcripción, adjuntos y **context files**.
 - Persistencia por archivos JSON.
 - Endpoints para crear, listar, renombrar y eliminar chats/proyectos.
 - Endpoint para generación automática de títulos.
-- multer para recepción de archivos (hasta 8, máx 10MB cada uno).
+- multer para recepción de archivos (hasta 8, máx 10MB cada uno para adjuntos; hasta 20 para context files).
 - Job escoba para limpieza de temporales cada 6h.
 
 ### Motor IA
@@ -59,9 +60,9 @@ Usuario → Frontend → Backend → Modo Router → Sistema de Prompts → Memo
 
 ---
 
-## 🧱 Sistema de prompts por capas (v1.3.0)
+## 🧱 Sistema de prompts por capas (v1.4.0)
 
-El system prompt se construye dinámicamente antes de cada llamada a LocalAI, ensamblando tres capas independientes.
+El system prompt se construye dinámicamente antes de cada llamada a LocalAI, ensamblando cuatro capas independientes.
 
 ### Orquestador
 
@@ -72,6 +73,8 @@ backend/config/buildSystemPrompt.js
 Importado en `localai.service.js` como:
 ```js
 const { buildSystemPrompt } = require('../config/buildSystemPrompt');
+// llamada con await — es async desde v1.4.0
+const systemPrompt = await buildSystemPrompt({ fullMemory, mode, variant, userId, projectId, userMessage });
 ```
 
 ### Estructura de archivos
@@ -107,6 +110,11 @@ Capa 2 — modes/{mode}.txt
 Capa 3 — projectMemory (opcional)
   Contexto del proyecto activo, leído de projectMemory.json.
   Solo se agrega si el chat pertenece a un proyecto con memoria configurada.
+
+Capa 4 — context files (opcional)
+  Archivos subidos al proyecto, ensamblados por context.service.js.
+  Delimitados con ### CONTEXT: PROJECT FILES ### ... ### CONTEXT: END ###
+  Solo se agrega si el proyecto tiene archivos de contexto habilitados.
 ```
 
 ### Cómo modificar el comportamiento del asistente
@@ -117,6 +125,63 @@ Para cambiar cómo responde Tempest, editar los archivos `.txt` directamente —
 - Cambiar cómo genera código → `modes/coder.strict.txt` o `modes/coder.hybrid.txt`
 - Cambiar cómo explica conceptos → `modes/explain.txt`
 - Cambiar el comportamiento general de conversación → `modes/general.txt`
+
+---
+
+## 📁 Sistema de Context Files (v1.4.0)
+
+### Arquitectura
+
+```text
+backend/services/context/
+├── context.service.js        ← orquestador público
+├── assembler.js              ← junta providers, llama budgeter
+├── budgeter.js               ← presupuesto + truncado inteligente
+└── providers/
+    ├── upload.provider.js    ← lee files/ del disco (v1)
+    └── fs.provider.js        ← stub seguro para lectura de disco (v2/Electron)
+```
+
+### Storage por proyecto
+
+```text
+backend/data/users/local-user/projects/{projectId}/
+├── projectMemory.json        ← memoria/resumen (existente)
+├── projectSettings.json      ← NUEVO: settings (prompts, reglas de contexto)
+└── context/
+    ├── index.json            ← inventario de items
+    └── files/
+        ├── f_001.txt         ← contenido extraído
+        └── f_001.meta.json   ← metadata del archivo original
+```
+
+### Contrato de Provider
+
+Todos los providers devuelven:
+```js
+{ id, name, relPath, alwaysInclude, includeWhenMentioned, priority, content }
+```
+
+### Budgeter — orden de prioridad
+
+```text
+1. alwaysInclude: true
+2. includeWhenMentioned: true  (y el nombre aparece en userMessage)
+3. resto (si hay espacio)
+```
+
+Límites: `maxFilesPerRequest` y `maxCharsTotal` desde `projectSettings.json`.
+
+### Endpoints REST
+
+```text
+GET    /project/:projectId/context/items
+POST   /project/:projectId/context/upload
+PATCH  /project/:projectId/context/item/:id
+DELETE /project/:projectId/context/item/:id
+GET    /project/:projectId/settings
+PATCH  /project/:projectId/settings
+```
 
 ---
 
@@ -191,7 +256,7 @@ Usuario
 
 - Cada chat tiene su propio historial y memoria de trabajo.
 - Un chat no puede leer el historial de otro chat.
-- Un chat dentro de proyecto accede a su memoria + memoria del proyecto + perfil global.
+- Un chat dentro de proyecto accede a memoria + memoria del proyecto + perfil global + **context files del proyecto**.
 - Un chat sin proyecto pertenece al proyecto especial `general`.
 - El modelo recibe los últimos 2 mensajes del historial filtrados por `isUsefulMessage`.
 
@@ -304,6 +369,7 @@ Tempest/
 │   │           └── prompt.builder.js
 │   ├── controllers/
 │   │   ├── chat.controller.js
+│   │   ├── context.controller.js         ← NUEVO
 │   │   └── transcription.controller.js
 │   ├── data/
 │   │   └── users/
@@ -314,18 +380,30 @@ Tempest/
 │   │               │   ├── projectMemory.json
 │   │               │   └── chats/
 │   │               └── project-name/
-│   │                   ├── projectMemory.json
-│   │                   └── chats/
+│   │               ├── projectMemory.json
+│   │                ├── projectSettings.json  ← NUEVO
+│   │                ├── chats/
+│   │                └── context/              ← NUEVO
+│   │                    ├── index.json
+│   │                    └── files/
 │   ├── outputs/
 │   │   └── transcriptions/
 │   ├── routes/
 │   │   ├── chat.routes.js
+│   │   ├── context.routes.js             ← NUEVO
 │   │   └── transcription.routes.js
 │   ├── services/
 │   │   ├── attachment.service.js
 │   │   ├── attachment/
 │   │   │   └── extractors/
 │   │   │       └── pptx.extractor.js
+│   │   ├── context/                      ← NUEVO
+│   │   │   ├── context.service.js
+│   │   │   ├── assembler.js
+│   │   │   ├── budgeter.js
+│   │   │   └── providers/
+│   │   │       ├── upload.provider.js
+│   │   │       └── fs.provider.js
 │   │   ├── localai.service.js
 │   │   ├── localai/
 │   │   │   ├── memory.answers.js
@@ -334,10 +412,13 @@ Tempest/
 │   │   ├── memory.service.js
 │   │   ├── mode.router.js
 │   │   └── transcription.service.js
+│   ├── scripts/
+│   │   └── migrate-projects.js           ← NUEVO
 │   ├── uploads/
 │   │   ├── attachments/
 │   │   ├── audio/
-│   │   └── chunks/
+│   │   ├── chunks/
+│   │   └── context-tmp/                  ← NUEVO
 │   ├── utils/
 │   │   ├── cleanReply.js
 │   │   └── sanitize.js
@@ -399,6 +480,12 @@ POST /project/delete
 POST /project/rename
 POST /title/generate
 POST /transcribe
+GET    /project/:projectId/context/items
+POST   /project/:projectId/context/upload
+PATCH  /project/:projectId/context/item/:id
+DELETE /project/:projectId/context/item/:id
+GET    /project/:projectId/settings
+PATCH  /project/:projectId/settings
 ```
 
 ---
@@ -416,3 +503,4 @@ POST /transcribe
 - Defensas activas contra comportamiento degenerativo del modelo (loops, tokens basura).
 - Preparado para migrar a base de datos.
 - Preparado para sistema multiusuario real.
+- Preparado para `source="fs"` (Electron/v2) sin tocar módulos existentes.
