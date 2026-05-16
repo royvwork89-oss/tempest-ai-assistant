@@ -14,8 +14,16 @@
 10. `rawTrimmed + attachmentContext` construye `historialMessage` sin prefijo → se guarda en memoria.
 11. `detectUserData` recibe el mensaje limpio del usuario.
 12. Backend llama a `streamToLocalAI` con `finalMessage` y `options.mode`.
-13. `getMaxTokens` asigna presupuesto de tokens según modo.
-14. Backend abre conexión SSE (`Content-Type: text/event-stream`).
+13. `buildSystemPrompt` (async) ensambla las 4 capas incluyendo context files del proyecto.
+14. `getMaxTokens` asigna presupuesto de tokens según modo.
+15. Backend abre conexión SSE (`Content-Type: text/event-stream`).
+16. LocalAI genera tokens uno por uno con `stream: true`.
+17. Cada token llega al backend → se reenvía al frontend con `res.write()`.
+18. Frontend recibe cada token vía `ReadableStream` → `onToken` lo agrega a `rawEl.textContent`.
+19. Al terminar el stream, backend envía `[DONE]` con metadata de adjuntos.
+20. `finalizeStreamingBubble` limpia stop tokens y prefijos filtrados (airbag visual), luego renderiza.
+21. Backend guarda `historialMessage` limpio en `chatHistory`.
+22. Frontend dispara renombrado automático si es el primer mensaje.
 15. LocalAI genera tokens uno por uno con `stream: true`.
 16. Cada token llega al backend → se reenvía al frontend con `res.write()`.
 17. Frontend recibe cada token vía `ReadableStream` → `onToken` lo agrega a `rawEl.textContent`.
@@ -23,6 +31,7 @@
 19. `finalizeStreamingBubble` limpia stop tokens y prefijos filtrados (airbag visual), luego renderiza.
 20. Backend guarda `historialMessage` limpio en `chatHistory`.
 21. Frontend dispara renombrado automático si es el primer mensaje.
+22. Frontend dispara renombrado automático si es el primer mensaje.
 
 ---
 
@@ -58,6 +67,32 @@ streamOptions.mode = mode → getMaxTokens usa mode para tokens
 
 ---
 
+## 🧱 Flujo de armado del system prompt (v1.4.0)
+
+```text
+localai.service.js
+↓ await buildSystemPrompt({ fullMemory, mode, variant, userId, projectId, userMessage })
+↓
+config/buildSystemPrompt.js
+↓ Capa 1: loadGlobalPrompt() → global.system.txt
+↓ Capa 2: loadModePrompt(mode, variant) → modes/{mode}.txt
+↓ Capa 3: loadProjectPrompt(userId, projectId) → projectMemory.json
+↓ Capa 4: await getProjectContext({ projectId, userMessage })
+  ↓ context.service.js → loadIndex, loadSettings
+  ↓ assembler.assemble([uploadProvider, fsProvider], { userMessage, rules })
+    ↓ uploadProvider.provide() → lee files/ del disco
+    ↓ fsProvider.provide() → stub vacío (v1)
+    ↓ budgeter.budget(allBlocks, rules, userMessage)
+      ↓ orden: alwaysInclude → mentioned → resto
+      ↓ límite: maxFilesPerRequest + maxCharsTotal
+      ↓ truncado inteligente con nota si excede
+  ↓ formatea con ### CONTEXT: PROJECT FILES ### ... ### CONTEXT: END ###
+↓ prompt.builder.buildPrompt({ globalPrompt, projectPrompt, modePrompt, memoryBlock, contextBlock })
+↓ system prompt final
+```
+
+---
+
 ## 🧹 Flujo de sanitización de salida del modelo
 
 ```text
@@ -78,6 +113,22 @@ Frontend: finalizeStreamingBubble recibe fullText acumulado durante stream
 ```
 
 El frontend mantiene su propio airbag porque renderiza durante el stream, antes de que backend procese y guarde en historial.
+
+---
+
+## 📁 Flujo de subida de context files
+
+1. Usuario abre menú `⋯` de un proyecto → "Archivos de contexto".
+2. Modal muestra lista actual de items del proyecto.
+3. Usuario presiona "+ Subir archivos" y selecciona archivos.
+4. Frontend llama `POST /project/:projectId/context/upload` con FormData.
+5. Backend recibe archivos vía multer en `uploads/context-tmp/`.
+6. Para cada archivo: `extractText(file)` reutilizando `attachment.service`.
+7. Se calcula SHA-256 del contenido — si ya existe ese hash, se descarta (deduplicación).
+8. Se guarda `f_XXX.txt` (contenido) y `f_XXX.meta.json` (metadata) en `context/files/`.
+9. Se agrega item al `context/index.json` del proyecto.
+10. Frontend actualiza la lista del modal.
+11. Temporales de multer se limpian inmediatamente.
 
 ---
 
@@ -130,11 +181,12 @@ El frontend mantiene su propio airbag porque renderiza durante el stream, antes 
 3. Se valida el nombre (caracteres inválidos, longitud).
 4. Usuario confirma.
 5. Se crea carpeta del proyecto.
-6. Se muestra pantalla inicial.
-7. Usuario escribe el primer mensaje.
-8. Se crea un chat dentro del proyecto.
-9. La IA genera el nombre del chat.
-10. El sidebar muestra proyecto y chat.
+6. `initProject(projectId)` inicializa `projectSettings.json`, `context/index.json` y `context/files/`.
+7. Se muestra pantalla inicial.
+8. Usuario escribe el primer mensaje.
+9. Se crea un chat dentro del proyecto.
+10. La IA genera el nombre del chat.
+11. El sidebar muestra proyecto y chat.
 
 ---
 
@@ -187,6 +239,7 @@ El frontend mantiene su propio airbag porque renderiza durante el stream, antes 
 **Capa A — inmediata:**
 - Tras cada request en `chat.controller.js`, el bloque `finally` llama a `cleanupFiles`.
 - Borra todos los archivos subidos en esa petición.
+- En `context.controller.js`, los temporales de multer se borran al terminar cada upload de context files.
 
 **Capa B — job escoba:**
 - `server.js` ejecuta `setInterval` cada 6 horas.
@@ -214,6 +267,7 @@ backend/controllers/chat.controller.js
 ↓ res.write(`data: ${JSON.stringify(token)}\n\n`)
 ↓
 services/localai.service.js → streamToLocalAI (AsyncGenerator)
+↓ await buildSystemPrompt({ ..., userMessage }) → 4 capas incluyendo context files
 ↓ fetch LocalAI con stream: true
 ↓ getMaxTokens(model, message, options.mode, hardwareProfile)
 ↓ ReadableStream → yield token por token
@@ -245,3 +299,4 @@ frontend: finalizeStreamingBubble
 - Error en stream: si los headers SSE ya se enviaron, se escribe `[ERROR]` y se cierra la conexión.
 - Toast de sistema para errores de conexión.
 - Burbuja de error en chat para errores contextuales.
+- Deduplicación silenciosa en context files (log en consola del servidor).

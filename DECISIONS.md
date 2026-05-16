@@ -409,8 +409,46 @@ Historial limpio. `detectUserData` recibe solo el mensaje real del usuario.
 
 ---
 
+## 📁 Context Files por proyecto (v1.4.0)
+
+### Decisión
+Implementar un sistema de archivos de contexto persistentes por proyecto, separado de los adjuntos por mensaje.
+
+### Separación de responsabilidades
+- `projectMemory.json` — memoria/resumen/decisiones del proyecto.
+- `projectSettings.json` — configuración (prompts, reglas de contexto).
+- `context/index.json` — inventario de archivos de contexto.
+- `context/files/` — contenido extraído de los archivos subidos.
+
+### Razón
+Los adjuntos de mensaje son temporales y específicos de una consulta. Los context files son persistentes y aplicables a todos los chats del proyecto. Mezclarlos crearía confusión y complejidad innecesaria.
+
+### Arquitectura: Providers + Assembler + Budgeter
+- **Providers** devuelven bloques con contrato estándar: `{ id, name, relPath, alwaysInclude, includeWhenMentioned, priority, content }`
+- **Assembler** junta providers y llama al budgeter.
+- **Budgeter** aplica presupuesto de chars con orden de prioridad y truncado inteligente.
+
+### Deduplicación por hash
+Antes de guardar un archivo se calcula SHA-256 del contenido extraído. Si ya existe un item con el mismo hash, se descarta silenciosamente.
+
+### `fs.provider.js` como stub
+En v1 (web) solo existe `upload.provider.js`. `fs.provider.js` es un stub vacío que permite implementar lectura de disco en v2 (Electron) sin tocar ningún otro módulo.
+
+### `buildSystemPrompt` pasa a async
+Desde v1.4.0, `buildSystemPrompt` es `async` para poder `await` la Capa 4. Todos los lugares que lo llaman usan `await`.
+
+### Script de migración
+`backend/scripts/migrate-projects.js` inicializa `projectSettings.json` y `context/index.json` en proyectos existentes. Es idempotente — omite archivos que ya existen.
+
+### Impacto
+Tempest mantiene contexto persistente de proyectos sin que el usuario tenga que adjuntarlo en cada mensaje.
+
+---
+
 ## 🔮 Decisiones futuras
 
+- Implementar `fs.provider.js` completo para Electron/v2 con containment check y realpath.
+- UI para editar el prompt de proyecto desde `projectSettings.json`.
 - Implementar LibreOffice headless para mejor calidad de extracción.
 - Orden real de slides PPTX leyendo `ppt/presentation.xml`.
 - Modo híbrido de modelos: LocalAI para código rutinario, API externa para arquitectura compleja.
@@ -418,4 +456,3 @@ Historial limpio. `detectUserData` recibe solo el mensaje real del usuario.
 - Añadir login real.
 - Añadir resumen automático por chat/proyecto.
 - Añadir embeddings para búsqueda semántica.
-- UI para editar el prompt de proyecto desde la pantalla de configuración del proyecto.
