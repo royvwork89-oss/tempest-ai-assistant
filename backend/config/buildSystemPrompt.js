@@ -2,8 +2,9 @@ const { loadGlobalPrompt }   = require('./prompts/loaders/global.loader');
 const { loadModePrompt }     = require('./prompts/loaders/mode.loader');
 const { loadProjectPrompt }  = require('./prompts/loaders/project.loader');
 const { buildPrompt }        = require('./prompts/loaders/prompt.builder');
+const { getProjectContext }  = require('../services/context/context.service');
 
-function buildSystemPrompt({ fullMemory = {}, mode = 'general', variant = null, userId, projectId }) {
+async function buildSystemPrompt({ fullMemory = {}, mode = 'general', variant = null, userId, projectId, userMessage = '' }) {
   const profile       = fullMemory.profile       || {};
   const projectMemory = fullMemory.projectMemory || {};
 
@@ -11,13 +12,14 @@ function buildSystemPrompt({ fullMemory = {}, mode = 'general', variant = null, 
   const projectPrompt = loadProjectPrompt(userId, projectId);
   const modePrompt    = loadModePrompt(mode, variant);
   const memoryBlock   = buildMemoryBlock(profile, projectMemory);
+  const contextBlock  = await getProjectContext({ projectId, userMessage });
 
-  // TEMPORAL
   console.log('[buildSystemPrompt] global:', globalPrompt.slice(0, 50));
   console.log('[buildSystemPrompt] mode:', mode, '| modePrompt:', modePrompt.slice(0, 50));
   console.log('[buildSystemPrompt] project:', projectPrompt ? 'SÍ' : 'vacío');
+  console.log('[buildSystemPrompt] contextFiles:', contextBlock ? `${contextBlock.length} chars` : 'vacío');
 
-  return buildPrompt({ globalPrompt, projectPrompt, modePrompt, memoryBlock });
+  return buildPrompt({ globalPrompt, projectPrompt, modePrompt, memoryBlock, contextBlock });
 }
 
 function buildMemoryBlock(profile, projectMemory) {

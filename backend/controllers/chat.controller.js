@@ -6,6 +6,8 @@ const {
   cleanupFiles
 } = require('../services/attachment.service');
 const { detectMode } = require('../services/mode.router');
+// Al inicio del archivo, después de los requires existentes
+const { initProject } = require('../services/context/context.service');
 
 function buildMemoryOptions(req) {
   return {
@@ -151,6 +153,7 @@ function listProjects(req, res) {
 function createProject(req, res) {
   const { projectId } = req.body;
   memory.createProject(projectId, buildMemoryOptions(req));
+  initProject(projectId);
   res.json({ ok: true });
 }
 

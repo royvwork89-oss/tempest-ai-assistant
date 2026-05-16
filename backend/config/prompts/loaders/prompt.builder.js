@@ -9,12 +9,13 @@
  * @param {string} params.memoryBlock   — perfil + memoria del proyecto
  * @returns {string}
  */
-function buildPrompt({ globalPrompt, projectPrompt, modePrompt, memoryBlock }) {
+function buildPrompt({ globalPrompt, projectPrompt, modePrompt, memoryBlock, contextBlock }) {
   const layers = [globalPrompt];
 
   if (projectPrompt) layers.push(projectPrompt);
   if (modePrompt)    layers.push(modePrompt);
   if (memoryBlock)   layers.push(memoryBlock);
+  if (contextBlock)  layers.push(contextBlock);
 
   return layers
     .map(layer => layer.trim())
