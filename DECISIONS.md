@@ -445,6 +445,22 @@ Tempest mantiene contexto persistente de proyectos sin que el usuario tenga que 
 
 ---
 
+## 🔗 project.loader.js conectado a projectSettings.json (v1.4.1)
+
+### Decisión
+Reemplazar la lectura de `project.system.txt` por `projectSettings.json → prompts.projectPromptText` en `project.loader.js`.
+
+### Razón
+`project.system.txt` nunca existió en los proyectos reales — la Capa 3 del system prompt siempre retornaba vacío. `projectSettings.json` ya tenía el campo `prompts.projectPromptText` desde v1.4.0 pero no estaba conectado al loader.
+
+### Impacto
+- La Capa 3 del system prompt ahora funciona correctamente.
+- El usuario puede editar el prompt de proyecto desde la UI sin tocar archivos.
+- `projectId === 'general'` se excluye explícitamente — ese proyecto no tiene configuración de prompt.
+- Base lista para agregar más campos editables desde UI (temperature, model, etc.) en el mismo modal.
+
+---
+
 ## 🔮 Decisiones futuras
 
 - Implementar `fs.provider.js` completo para Electron/v2 con containment check y realpath.

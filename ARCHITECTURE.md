@@ -107,9 +107,10 @@ Capa 2 — modes/{mode}.txt
   Instrucciones específicas del modo detectado por mode.router.js.
   Cambia en cada request según el tipo de consulta.
 
-Capa 3 — projectMemory (opcional)
-  Contexto del proyecto activo, leído de projectMemory.json.
-  Solo se agrega si el chat pertenece a un proyecto con memoria configurada.
+Capa 3 — projectPrompt (opcional)
+  Prompt personalizado del proyecto, leído de projectSettings.json → prompts.projectPromptText.
+  Editable desde la UI: menú ⋯ del proyecto → Configuración.
+  Solo se agrega si el campo no está vacío. Excluido para projectId === 'general'.
 
 Capa 4 — context files (opcional)
   Archivos subidos al proyecto, ensamblados por context.service.js.

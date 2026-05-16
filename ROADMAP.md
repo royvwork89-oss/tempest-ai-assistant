@@ -205,7 +205,7 @@ Sistema funcional con:
 - [x] Capa 2: prompt de modo (coder/explain/general)
 - [x] Capa 3: prompt de proyecto (desde projectMemory)
 - [x] Capa 4: context files del proyecto (desde context/index.json)
-- [ ] UI para editar el prompt de proyecto desde la pantalla de configuración
+- [x] UI para editar el prompt de proyecto desde la pantalla de configuración
 
 ### 📸 Prioridad 3 — Context Snapshot del repo
 - [ ] Generar `projectContext.json` con estructura, archivos relevantes, hash y mtime
@@ -255,7 +255,7 @@ Sistema funcional con:
 - [x] Context Snapshot del repo — `projectContext.json` con estructura, archivos relevantes, hash y mtime
 - [x] Context files por proyecto — subida manual, gestión UI, inyección en prompt
 - [ ] Context files por proyecto — lectura de carpetas del disco (Electron/v2)
-- [ ] UI para configurar prompts de proyecto
+- [x] UI para configurar prompts de proyecto
 
 ### 🤖 Inteligencia y selección de modelos
 - [ ] Router inteligente de modelos

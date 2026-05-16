@@ -76,7 +76,7 @@ localai.service.js
 config/buildSystemPrompt.js
 ↓ Capa 1: loadGlobalPrompt() → global.system.txt
 ↓ Capa 2: loadModePrompt(mode, variant) → modes/{mode}.txt
-↓ Capa 3: loadProjectPrompt(userId, projectId) → projectMemory.json
+↓ Capa 3: loadProjectPrompt(userId, projectId) → projectSettings.json → prompts.projectPromptText
 ↓ Capa 4: await getProjectContext({ projectId, userMessage })
   ↓ context.service.js → loadIndex, loadSettings
   ↓ assembler.assemble([uploadProvider, fsProvider], { userMessage, rules })

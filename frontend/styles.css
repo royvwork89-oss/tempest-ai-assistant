@@ -472,13 +472,17 @@ body {
 }
 
 .modal-box input,
-.modal-box select {
+.modal-box select,
+.modal-box textarea {
   width: 100%;
   padding: 12px;
   border-radius: 12px;
   background: #020617;
   color: #f8fafc;
   border: 1px solid rgba(148, 163, 184, 0.25);
+  font-family: inherit;
+  font-size: 14px;
+  resize: vertical;
 }
 
 .modal-actions {
