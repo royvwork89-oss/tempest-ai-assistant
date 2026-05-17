@@ -274,7 +274,6 @@ Sistema funcional con:
 ### 🧠 Contexto y comprensión del proyecto
 - [x] Context Snapshot del repo — `projectContext.json` con estructura, archivos relevantes, hash y mtime
 - [x] Context files por proyecto — subida manual, gestión UI, inyección en prompt
-- [ ] Context files por proyecto — lectura de carpetas del disco (Electron/v2)
 - [x] UI para configurar prompts de proyecto
 
 ### 🤖 Inteligencia y selección de modelos
@@ -302,4 +301,5 @@ Sistema funcional con:
 - [ ] Sistema de login y múltiples usuarios
 - [ ] Búsqueda semántica con embeddings
 - [ ] App desktop con Electron
+- [ ] Context files por proyecto — lectura de carpetas del disco (Electron/v2)
 - [ ] Integración de correo Outlook
