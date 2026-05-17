@@ -461,6 +461,35 @@ Reemplazar la lectura de `project.system.txt` por `projectSettings.json → prom
 
 ---
 
+## 🤖 Router inteligente de modelos (v1.5.0)
+
+### Decisión
+Crear `backend/services/model.router/` como módulo independiente con 5 submódulos que separan responsabilidades.
+
+### Razón
+El router de modos ya detecta qué tipo de respuesta dar. El siguiente paso natural es seleccionar el modelo óptimo para cada tarea. Separarlo en módulos permite modificar cada pieza sin tocar las demás.
+
+### Arquitectura
+- `capability.matrix.js` — fuente de verdad de qué modelos existen por hardware y qué alias lógico les corresponde.
+- `task.detector.js` — heurísticas que mapean modo + mensaje + contextSize → taskProfile.
+- `profile.mapper.js` — traduce taskProfile + autoProfile → alias lógico.
+- `fallback.manager.js` — fallback absoluto ante errores técnicos.
+- `index.js` — orquestador público con `_log()` estructurado.
+
+### HARDWARE_PROFILE hardcodeado
+Se decidió hardcodear `const HARDWARE_PROFILE = 'desktop'` en `chat.controller.js` en lugar de auto-detectarlo. La auto-detección agrega complejidad sin beneficio real — el desarrollador sabe en qué máquina está. Cambiar entre desktop y laptop es editar una línea.
+
+### GPU count: 0 — falso negativo de LocalAI v2.25
+LocalAI reporta `GPU count: 0` al inicio — es un falso negativo del arranque en Go. La GPU se activa cuando llama.cpp carga el primer modelo. La prueba real es `offloaded X/X layers to GPU` en los logs del proceso GRPC.
+
+### Prerequisito WSL2 + Docker Desktop
+`wsl --shutdown` antes de levantar LocalAI es obligatorio en Docker Desktop con WSL2. Sin este paso el nvidia-container-runtime falla con `exit status 2`. El montaje de `/usr/lib/wsl/lib` es necesario para que llama.cpp encuentre las librerías CUDA del stub de WSL2.
+
+### Impacto
+Tempest selecciona automáticamente el modelo más adecuado para cada consulta. El usuario puede elegir perfil de calidad (rápido/balanceado/calidad) o seleccionar modelo manualmente.
+
+---
+
 ## 🔮 Decisiones futuras
 
 - Implementar `fs.provider.js` completo para Electron/v2 con containment check y realpath.

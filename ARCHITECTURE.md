@@ -40,6 +40,7 @@ Usuario → Frontend → Backend → Modo Router → Sistema de Prompts → Memo
 - Controladores para chat, transcripción y **context files**.
 - **Streaming SSE** en `chat.controller.js` — usa `Content-Type: text/event-stream` y reenvía tokens con `res.write()`.
 - **Router de modos** en `services/mode.router.js` — detecta `coder/strict`, `coder/hybrid`, `explain`, `general`.
+- **Router inteligente de modelos** en `services/model.router/` — selecciona el modelo óptimo según tipo de tarea, perfil de calidad y hardware. Orquestador en `index.js`, registro de modelos en `capability.matrix.js`, detección de tarea en `task.detector.js`, mapeo en `profile.mapper.js`, fallback en `fallback.manager.js`.
 - **Sistema de prompts por capas** en `config/buildSystemPrompt.js` — ensambla system prompt dinámicamente desde archivos de texto. Es `async` desde v1.4.0 para incluir la Capa 4.
 - **Separación mensaje al modelo vs historial** — `finalMessage` con prefijo va al modelo; `historialMessage` sin prefijo se guarda en memoria.
 - Servicios separados para LocalAI, memoria, transcripción, adjuntos y **context files**.
@@ -228,6 +229,42 @@ localai.service.js
 
 ---
 
+## 🤖 Router inteligente de modelos (v1.5.0)
+
+chat.controller.js
+↓ selectModel({ mode, variant, messageText, contextSize, configModel, autoProfile, hardwareProfile })
+↓
+services/model.router/index.js
+↓ task.detector.js → taskProfile (general-fast, coder-heavy, explain-deep, etc.)
+↓ profile.mapper.js → alias lógico según autoProfile (rapido/balanceado/calidad)
+↓ capability.matrix.js → modelo real según hardwareProfile
+↓ fallback.manager.js → modelo de emergencia si falla
+↓ { model, reason, alias, taskProfile }
+↓
+chat.controller.js → pasa model a streamToLocalAI
+
+### Alias lógicos
+| Alias | Descripción |
+|-------|-------------|
+| `general-fast` | Conversación rápida |
+| `general-standard` | Conversación balanceada |
+| `explain-deep` | Explicaciones y análisis |
+| `coder-fast` | Código simple y snippets |
+| `coder-heavy` | Código complejo y arquitectura |
+| `fallback` | Emergencia ante error técnico |
+
+### Perfiles de calidad
+| Perfil | Comportamiento |
+|--------|---------------|
+| `rapido` | Modelos más ligeros, respuesta inmediata |
+| `balanceado` | Equilibrio calidad/velocidad (default) |
+| `calidad` | Modelos más capaces, más lentos |
+
+### HARDWARE_PROFILE
+Hardcodeado en `chat.controller.js` como `const HARDWARE_PROFILE = 'desktop'`. Para cambiar entre desktop y laptop, editar esta constante.
+
+---
+
 ## 🛡️ Defensas del modelo en `localai.service.js`
 
 ### processedMessage
@@ -410,6 +447,12 @@ Tempest/
 │   │   │   ├── memory.answers.js
 │   │   │   ├── response.validator.js
 │   │   │   └── token.profiles.js
+│   │   ├── model.router/
+│   │   │   ├── index.js
+│   │   │   ├── capability.matrix.js
+│   │   │   ├── task.detector.js
+│   │   │   ├── profile.mapper.js
+│   │   │   └── fallback.manager.js
 │   │   ├── memory.service.js
 │   │   ├── mode.router.js
 │   │   └── transcription.service.js

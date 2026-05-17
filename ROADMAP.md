@@ -2,12 +2,14 @@
 
 ## 🚧 Estado actual
 
-Versión actual: **v1.4.0**
+Versión actual: **v1.5.0**
 
 Sistema funcional con:
 
 - Chat local con IA (modelos Q4, Q5, Q6 para desktop; Llama 3.2 3B / Qwen2.5 3B para laptop)
-- LocalAI v2.24 como motor principal con GPU activa (RTX 4070, `gpu-layers: 99`)
+- **5 modelos nuevos desktop** — LLaMA 3.1 8B Q5, Qwen2.5 7B Q5, Gemma 2 9B Q4, DeepSeek Coder 6.7B Q6, Qwen Coder 14B Q4
+- LocalAI v2.25 como motor principal con GPU activa (RTX 4070, `gpu-layers: 99`)
+- **Router inteligente de modelos** — selección automática según tipo de tarea, perfil y hardware
 - Memoria por usuario/proyecto/chat
 - Chats independientes y por proyecto
 - Sidebar tipo workspace
@@ -116,6 +118,24 @@ Sistema funcional con:
 
 ---
 
+## 🎯 v1.5 — Router inteligente de modelos ✅
+
+- [x] `model.router/` — arquitectura modular con 5 submódulos independientes
+- [x] `capability.matrix.js` — registro central de modelos por hardware, alias lógicos
+- [x] `task.detector.js` — heurísticas de detección de tipo de tarea
+- [x] `profile.mapper.js` — mapeo tarea + perfil → alias lógico
+- [x] `fallback.manager.js` — fallback simple ante errores técnicos
+- [x] `index.js` — orquestador público con logging estructurado
+- [x] Integración en `chat.controller.js` — selección automática o manual
+- [x] `HARDWARE_PROFILE` hardcodeado en controller — simple y estable
+- [x] Opción "Automático" en el menú de modelos del frontend
+- [x] `resolveAutoModel` eliminado del frontend — decisión movida al backend
+- [x] 5 YAMLs nuevos para modelos desktop — templates y stopwords correctos
+- [x] `token.profiles.js` actualizado con perfiles de los 5 modelos nuevos
+- [x] GPU activa confirmada — 33/33 capas en VRAM, 42 tok/s en hermes-q4
+- [x] docker-compose.yml corregido — montaje `/usr/lib/wsl/lib`, `wsl --shutdown` como prerequisito
+
+---
 
 
 
@@ -258,9 +278,9 @@ Sistema funcional con:
 - [x] UI para configurar prompts de proyecto
 
 ### 🤖 Inteligencia y selección de modelos
-- [ ] Router inteligente de modelos
-- [ ] DeepSeek-Coder 6.7B como modelo principal para programación diaria
-- [ ] Qwen2.5-Coder 14B para arquitectura y razonamiento complejo
+- [x] Router inteligente de modelos — `model.router/` con capability matrix, task detector, profile mapper
+- [x] DeepSeek-Coder 6.7B disponible como modelo de código diario
+- [x] Qwen2.5-Coder 14B disponible para arquitectura y razonamiento complejo
 
 ### 🛠️ Edición y flujo de desarrollo
 - [ ] Patch Mode — cambios en formato diff

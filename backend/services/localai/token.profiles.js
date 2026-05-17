@@ -6,15 +6,15 @@ const HARDWARE_TOKEN_PROFILES = {
     'llama-3.2-3b-q4': { normal: 600, code: 1000, continue: 1000 }
   },
   desktop: {
-    default:                  { normal: 400,  code: 1200, continue: 1200 },
-    'hermes-q4':              { normal: 400,  code: 1200, continue: 1200 },
-    'hermes-q5':              { normal: 500,  code: 1400, continue: 1400 },
-    'hermes-q6':              { normal: 600,  code: 1600, continue: 1600 },
-    'llama-3.1-8b-q5':        { normal: 500,  code: 1400, continue: 1400 },
-    'qwen2.5-7b-q5':          { normal: 500,  code: 1400, continue: 1400 },
-    'gemma-2-9b-q4':          { normal: 500,  code: 1200, continue: 1200 },
-    'deepseek-coder-6.7b-q6': { normal: 400,  code: 1600, continue: 1600 },
-    'qwen-coder-14b-q4':      { normal: 500,  code: 2000, continue: 2000 },
+    default: { normal: 400, code: 1200, continue: 1200 },
+    'hermes-q4': { normal: 400, code: 1200, continue: 1200 },
+    'hermes-q5': { normal: 500, code: 1400, continue: 1400 },
+    'hermes-q6': { normal: 600, code: 1600, continue: 1600 },
+    'llama-3.1-8b-q5': { normal: 500, code: 1400, continue: 1400 },
+    'qwen2.5-7b-q5': { normal: 500, code: 1400, continue: 1400 },
+    'gemma-2-9b-q4': { normal: 500, code: 1200, continue: 1200 },
+    'deepseek-coder-6.7b-q6': { normal: 400, code: 1600, continue: 1600 },
+    'qwen-coder-14b-q4': { normal: 500, code: 2000, continue: 2000 },
   }
 };
 
@@ -30,7 +30,7 @@ function getMaxTokens(model, message, mode = 'general', hardwareProfile = 'lapto
   const modelConfig = hardwareConfig[selectedModel] || hardwareConfig.default;
 
   if (mode === 'continue') return modelConfig.continue;
-  if (mode === 'coder') return modelConfig.code;
+  if (mode === 'coder' || mode === 'coder/strict' || mode === 'coder/hybrid') return modelConfig.code;
   if (mode === 'explain') return modelConfig.normal;
   // general o legacy: fallback al regex anterior
   if (isCodeRequest(message)) return modelConfig.code;

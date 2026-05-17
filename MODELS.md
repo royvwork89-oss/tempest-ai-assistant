@@ -398,6 +398,52 @@ El modo `coder` usa tokens altos para permitir respuestas con múltiples archivo
 
 ---
 
+## 🖥️ Modelos nuevos desktop (v1.5.0)
+
+| Nombre | Archivo GGUF | Uso recomendado |
+|--------|-------------|-----------------|
+| `llama-3.1-8b-q5` | `Meta-Llama-3.1-8B-Instruct-Q5_K_M.gguf` | General, razonamiento |
+| `qwen2.5-7b-q5` | `qwen2.5-7b-instruct-q5_k_m.gguf` | Razonamiento, análisis |
+| `gemma-2-9b-q4` | `gemma-2-9b-it-Q4_K_M.gguf` | Explicaciones, análisis |
+| `deepseek-coder-6.7b-q6` | `deepseek-coder-6.7b-instruct.Q6_K.gguf` | Código simple, snippets |
+| `qwen-coder-14b-q4` | `qwen2.5-coder-14b-instruct-q4_k_m.gguf` | Código complejo, arquitectura |
+
+### Templates de los modelos nuevos
+
+| Modelo | Template | Stopword fin |
+|--------|---------|-------------|
+| `llama-3.1-8b-q5` | Llama 3 Instruct | `<\|eot_id\|>` |
+| `qwen2.5-7b-q5` | ChatML | `<\|im_end\|>` |
+| `gemma-2-9b-q4` | Gemma IT | `<end_of_turn>` |
+| `deepseek-coder-6.7b-q6` | ChatML | `<\|im_end\|>` |
+| `qwen-coder-14b-q4` | ChatML | `<\|im_end\|>` |
+
+### Problema conocido: GPU count: 0 en logs de inicio
+
+LocalAI v2.25 reporta `GPU count: 0` al arrancar — esto es un **falso negativo**. La GPU se activa correctamente cuando llama.cpp carga el primer modelo. Confirmado con `offloaded 33/33 layers to GPU` y velocidades de 40+ tok/s.
+
+**Prerequisito para GPU en WSL2 + Docker:**
+```bash
+wsl --shutdown
+docker-compose down
+docker-compose up -d
+```
+
+El `wsl --shutdown` antes de levantar LocalAI es obligatorio para que el runtime de NVIDIA funcione correctamente en Docker Desktop con WSL2.
+
+**docker-compose.yml — configuración que funciona:**
+```yaml
+volumes:
+  - ../models-localai:/models
+  - /usr/lib/wsl/lib:/usr/lib/wsl/lib:ro
+environment:
+  - LOCALAI_FORCE_META_BACKEND_CAPABILITY=nvidia
+  - CUDA_VISIBLE_DEVICES=0
+  - LD_LIBRARY_PATH=/usr/lib/wsl/lib:/usr/local/cuda/lib64:/usr/lib/x86_64-linux-gnu
+```
+
+---
+
 ## 🧪 Pruebas de humo después de cambiar el YAML
 
 Después de cualquier cambio en el YAML hacer `docker restart localai` y probar en orden:
