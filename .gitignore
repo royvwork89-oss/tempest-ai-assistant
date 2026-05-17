@@ -26,4 +26,4 @@ backend/outputs/
 backend/uploads/audio/
 backend/uploads/chunks/
 backend/data/users/
-backend/outputs/documents/
+backend/outputs/documents/models-localai/*.crdownload
