@@ -18,7 +18,6 @@ import {
   HARDWARE_PROFILE,
   APP_MODE,
   MODEL_PROFILES,
-  resolveAutoModel,
   getLabel,
   renderLocalModels,
   refreshLocalActiveState,
@@ -461,13 +460,9 @@ async function sendMessage() {
 
   await ensureGeneralChatExists();
 
-  const selectedModel = primaryModel === 'auto' ? resolveAutoModel(message) : primaryModel;
-
-  if (primaryModel === 'auto' && APP_MODE === 'dev')
-    menuTrigger.textContent = `modo: Automático local · usando ${getLabel(selectedModel)}`;
-
   const config = {
-    primaryModel: selectedModel,
+    primaryModel:    primaryModel,
+    autoProfile:     'balanceado',
     hardwareProfile: HARDWARE_PROFILE,
     assistants: Object.entries(assistantsState).map(([provider, s]) => ({ provider, ...s }))
   };

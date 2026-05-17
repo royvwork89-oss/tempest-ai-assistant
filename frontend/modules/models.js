@@ -6,40 +6,25 @@ export const APP_MODE = 'dev';
 
 export const MODEL_PROFILES = {
   laptop: [
+    { model: 'auto',            label: '⚡ Automático' },
     { model: 'qwen2.5-3b-q4',  label: 'Qwen 2.5 3B Q4 - Rápido' },
     { model: 'qwen2.5-3b-q5',  label: 'Qwen 2.5 3B Q5 - Equilibrado' },
     { model: 'llama-3.2-3b-q4', label: 'LLaMA 3.2 3B Q4 - Inteligente' },
-    { model: 'auto',            label: 'Automático' }
   ],
   desktop: [
-    { model: 'hermes-q4',      label: 'Hermes 8B Q4 - Rápido' },
-    { model: 'hermes-q5',      label: 'Hermes 8B Q5 - Equilibrado' },
-    { model: 'hermes-q6',      label: 'Hermes 8B Q6 - Inteligente' },
-    { model: 'qwen2.5-3b-q5',  label: 'Qwen 2.5 3B Q5 - Generador rápido' },
-    { model: 'auto',           label: 'Automático' }
+    { model: 'auto',                   label: '⚡ Automático' },
+    { model: 'hermes-q4',              label: 'Hermes 8B Q4 - Rápido' },
+    { model: 'hermes-q5',              label: 'Hermes 8B Q5 - Equilibrado' },
+    { model: 'hermes-q6',              label: 'Hermes 8B Q6 - Preciso' },
+    { model: 'llama-3.1-8b-q5',        label: 'LLaMA 3.1 8B Q5 - General' },
+    { model: 'qwen2.5-7b-q5',          label: 'Qwen 2.5 7B Q5 - Razonamiento' },
+    { model: 'gemma-2-9b-q4',          label: 'Gemma 2 9B Q4 - Análisis' },
+    { model: 'deepseek-coder-6.7b-q6', label: 'DeepSeek Coder 6.7B - Código rápido' },
+    { model: 'qwen-coder-14b-q4',      label: 'Qwen Coder 14B - Código complejo' },
   ]
 };
 
-export function resolveAutoModel(message) {
-  const text = message.toLowerCase();
-
-  const isComplex =
-    text.includes('código') || text.includes('codigo') ||
-    text.includes('express') || text.includes('mysql') ||
-    text.includes('backend') || text.includes('arquitectura') ||
-    text.includes('paso a paso') || text.includes('explica') ||
-    text.length > 180;
-
-  const isMedium =
-    text.length > 80 || text.includes('ejemplo') ||
-    text.includes('comparar') || text.includes('recomienda') ||
-    text.includes('cómo') || text.includes('como');
-
-  const profiles = MODEL_PROFILES[HARDWARE_PROFILE];
-  if (isComplex) return profiles[2].model;
-  if (isMedium)  return profiles[1].model;
-  return profiles[0].model;
-}
+// resolveAutoModel eliminado — la decisión la toma el backend (model.router)
 
 export function getLabel(model) {
   const localModels = MODEL_PROFILES[HARDWARE_PROFILE] || [];

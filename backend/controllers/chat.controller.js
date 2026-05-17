@@ -8,6 +8,8 @@ const {
 const { detectMode } = require('../services/mode.router');
 // Al inicio del archivo, después de los requires existentes
 const { initProject } = require('../services/context/context.service');
+const { detectBestModel } = require('../services/model.router');
+const HARDWARE_PROFILE = 'desktop'; // cambiar a 'laptop' en la laptop
 
 function buildMemoryOptions(req) {
   return {
@@ -79,10 +81,25 @@ async function chat(req, res) {
       memory.addMessage('user', attachmentContext, memoryOptions);
     }
 
+    // Selección de modelo: manual o automático
+    let selectedModel = config.primaryModel || 'hermes-q4';
+
+    if (config.primaryModel === 'auto') {
+      const routerDecision = detectBestModel({
+        rawMessage:   rawTrimmed,
+        mode,
+        files,
+        contextSize:  0,
+        autoProfile:  config.autoProfile || 'balanceado',
+        hardware:     HARDWARE_PROFILE,
+      });
+      selectedModel = routerDecision.model;
+    }
+
     const streamOptions = {
       ...memoryOptions,
-      primaryModel: config.primaryModel || 'hermes-q4',
-      hardwareProfile: config.hardwareProfile || 'laptop',
+      primaryModel:    selectedModel,
+      hardwareProfile: HARDWARE_PROFILE,
       mode,
       variant
     };
